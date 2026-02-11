@@ -4,13 +4,13 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   setPersistence,
-  inMemoryPersistence,
+  browserLocalPersistence,
   sendPasswordResetEmail,
 } from 'firebase/auth';
 
 export const registerUser = async (email, password) => {
   try {
-    await setPersistence(auth, inMemoryPersistence);
+    await setPersistence(auth, browserLocalPersistence);
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const token = await userCredential.user.getIdToken();
     localStorage.setItem('firebaseToken', token);
@@ -22,7 +22,7 @@ export const registerUser = async (email, password) => {
 
 export const loginUser = async (email, password) => {
   try {
-    await setPersistence(auth, inMemoryPersistence);
+    await setPersistence(auth, browserLocalPersistence);
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const token = await userCredential.user.getIdToken();
     localStorage.setItem('firebaseToken', token);
