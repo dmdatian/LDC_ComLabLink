@@ -1,0 +1,358 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { seatsAPI } from '../utils/api';
+// BOOKING COMPONENT: add/replace your booking UI file here
+import SeatBooking from '../components/SeatBooking';
+import { logoutUser } from '../utils/auth';
+import { feedbackAPI } from '../utils/api';
+import logoName from '../assets/logo_name.png';
+
+export default function StudentDashboard({ user, userName }) {
+  // STATE: bookings + UI
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackStatus, setFeedbackStatus] = useState('');
+  const [activeSection, setActiveSection] = useState('home');
+  const [pendingCancelId, setPendingCancelId] = useState(null);
+  const navigate = useNavigate();
+
+  const toDate = (value) => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (value.seconds) return new Date(value.seconds * 1000);
+    if (value._seconds) return new Date(value._seconds * 1000);
+    if (value.toDate) return value.toDate();
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+  // EFFECTS: initial data
+  useEffect(() => {
+    fetchBookings();
+  }, []);
+
+  // BOOKINGS API: fetch
+  const fetchBookings = async () => {
+    try {
+      const response = await seatsAPI.getMySeats();
+      setBookings(response.data.data || []);
+    } catch (err) {
+      setError('Failed to load bookings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getUpcomingBooking = () => {
+    const now = new Date();
+    const upcoming = bookings
+      .filter((booking) => {
+        const status = (booking.status || '').toLowerCase();
+        if (['cancelled', 'rejected'].includes(status)) return false;
+        const start = booking.startTime
+          ? toDate(booking.startTime)
+          : booking.date && booking.start
+            ? new Date(`${booking.date}T${booking.start}:00`)
+            : booking.date && booking.startTime
+              ? new Date(`${booking.date}T${booking.startTime}:00`)
+              : null;
+        if (!start) return false;
+        return start > now;
+      })
+      .sort((a, b) => {
+        const aStart = a.startTime
+          ? toDate(a.startTime)
+          : a.date && (a.start || a.startTime)
+            ? new Date(`${a.date}T${a.start || a.startTime}:00`)
+            : new Date(0);
+        const bStart = b.startTime
+          ? toDate(b.startTime)
+          : b.date && (b.start || b.startTime)
+            ? new Date(`${b.date}T${b.start || b.startTime}:00`)
+            : new Date(0);
+        return aStart - bStart;
+      });
+
+    return upcoming[0] || null;
+  };
+
+  // BOOKINGS API: cancel
+  const handleCancelBooking = async (bookingId) => {
+    try {
+      await seatsAPI.cancelSeatBooking(bookingId);
+      setBookings(bookings.filter(b => b.id !== bookingId));
+      setPendingCancelId(null);
+    } catch (err) {
+      setError('Failed to cancel booking');
+      setPendingCancelId(null);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logoutUser();
+    navigate('/login');
+  };
+
+  // FEEDBACK: submit
+  const handleFeedbackSubmit = (e) => {
+    e.preventDefault();
+    if (!feedbackMessage.trim()) {
+      setFeedbackStatus('Please enter your feedback.');
+      return;
+    }
+
+    feedbackAPI.submitFeedback(feedbackMessage.trim(), 'general', 'student-dashboard')
+      .then(() => {
+        setFeedbackMessage('');
+        setFeedbackStatus('Thanks! Your feedback was submitted.');
+      })
+      .catch(() => {
+        setFeedbackStatus('Failed to submit feedback. Please try again.');
+      });
+  };
+
+  return (
+    <div className="fixed inset-0 flex overflow-hidden">
+      
+      {/* LEFT MENU */}
+      <aside className="fixed left-0 inset-y-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto">
+        <div className="mb-3 rounded-lg bg-white p-2">
+          <img
+            src={logoName}
+            alt="Liceo logo and name"
+            className="h-9 w-auto object-contain"
+          />
+        </div>
+        <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
+        <p className="text-sm text-blue-100 mb-8">
+          {userName || user?.displayName || user?.name || 'Student'}
+        </p>
+
+        <nav className="space-y-3">
+          <button
+            onClick={() => setActiveSection('home')}
+            className={`w-full text-left px-4 py-2 rounded transition ${
+              activeSection === 'home' ? 'bg-blue-600' : 'hover:bg-blue-600'
+            }`}
+          >
+            Home
+          </button>
+
+          <button
+            onClick={() => setActiveSection('booking')}
+            className={`w-full text-left px-4 py-2 rounded transition ${
+              activeSection === 'booking' ? 'bg-blue-600' : 'hover:bg-blue-600'
+            }`}
+          >
+            Booking
+          </button>
+
+          <button
+            onClick={() => setActiveSection('feedback')}
+            className={`w-full text-left px-4 py-2 rounded transition ${
+              activeSection === 'feedback' ? 'bg-blue-600' : 'hover:bg-blue-600'
+            }`}
+          >
+            Feedback
+          </button>
+        </nav>
+
+        <div className="mt-auto">
+          <button
+            onClick={handleLogout}
+            className="w-full bg-red-500 hover:bg-red-600 px-4 py-2 rounded transition"
+          >
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <main className="ml-64 flex-1 overflow-y-auto p-8">
+        {/* HOME SECTION */}
+        {activeSection === 'home' && (
+          <section className="mb-10">
+            <h1 className="text-3xl font-bold mb-2">
+              Welcome, {userName || user?.displayName || user?.name || 'Student'}.
+            </h1>
+            <p className="text-gray-600 mb-6">Here is a quick summary of your account.</p>
+
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+                {error}
+              </div>
+            )}
+
+            {loading ? (
+              <p className="text-gray-500">Loading summary...</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="bg-white rounded-lg shadow-lg p-5">
+                  <p className="text-sm text-gray-500">Total Bookings</p>
+                  <p className="text-3xl font-bold">{bookings.length}</p>
+                </div>
+                <div className="bg-white rounded-lg shadow-lg p-5">
+                  <p className="text-sm text-gray-500">Upcoming</p>
+                  <p className="text-3xl font-bold">
+                    {bookings.filter((booking) => {
+                      const status = (booking.status || '').toLowerCase();
+                      if (['cancelled', 'rejected'].includes(status)) return false;
+                      const start = toDate(booking.startTime)
+                        || (booking.date && booking.start
+                          ? new Date(`${booking.date}T${booking.start}:00`)
+                          : booking.date && booking.startTime
+                            ? new Date(`${booking.date}T${booking.startTime}:00`)
+                            : null);
+                      return start ? start > new Date() : false;
+                    }).length}
+                  </p>
+                </div>
+                <div className="bg-white rounded-lg shadow-lg p-5">
+                  <p className="text-sm text-gray-500">Attended</p>
+                  <p className="text-3xl font-bold">
+                    {bookings.filter((booking) => booking.status === 'attended').length}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+              <h2 className="text-xl font-bold mb-2">Upcoming Booking</h2>
+              {loading ? (
+                <p className="text-gray-500">Loading upcoming booking...</p>
+              ) : (() => {
+                const upcoming = getUpcomingBooking();
+                if (!upcoming) {
+                  return <p className="text-gray-600">No upcoming bookings.</p>;
+                }
+
+                const seats = Array.isArray(upcoming.seats)
+                  ? upcoming.seats
+                  : upcoming.seat
+                    ? [upcoming.seat]
+                    : [];
+
+                const startDateTime = upcoming.startTime
+                  ? toDate(upcoming.startTime)
+                  : upcoming.date && (upcoming.start || upcoming.startTime)
+                    ? new Date(`${upcoming.date}T${upcoming.start || upcoming.startTime}:00`)
+                    : null;
+                const endDateTime = upcoming.endTime
+                  ? toDate(upcoming.endTime)
+                  : upcoming.date && (upcoming.end || upcoming.endTime)
+                    ? new Date(`${upcoming.date}T${upcoming.end || upcoming.endTime}:00`)
+                    : null;
+
+                return (
+                  <div className="text-gray-700">
+                    <p className="font-semibold">
+                      {startDateTime
+                        ? startDateTime.toLocaleDateString()
+                        : (upcoming.date || 'Unknown date')}
+                      {startDateTime && endDateTime && (
+                        <> {' - '} {startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{' '}
+                          {endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</>
+                      )}
+                    </p>
+                    {seats.length > 0 && (
+                      <p>Seat: {seats.join(', ')}</p>
+                    )}
+                    {upcoming.subject && (
+                      <p>Subject: {upcoming.subject}</p>
+                    )}
+                    {upcoming.purpose && (
+                      <p>Purpose: {upcoming.purpose}</p>
+                    )}
+                    {upcoming.status && (
+                      <p className="capitalize">Status: {upcoming.status}</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setPendingCancelId(upcoming.id)}
+                      className="mt-3 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
+                    >
+                      Cancel Booking
+                    </button>
+
+                    {pendingCancelId === upcoming.id && (
+                      <div className="mt-4 border border-red-200 bg-red-50 rounded-lg p-4">
+                        <p className="text-sm text-red-700 font-semibold mb-3">
+                          Cancel this booking?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleCancelBooking(upcoming.id)}
+                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition"
+                          >
+                            Yes, cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPendingCancelId(null)}
+                            className="bg-white border border-red-200 text-red-700 px-3 py-1 rounded transition hover:bg-red-100"
+                          >
+                            No, keep it
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-2">Notification</h2>
+              <p className="text-gray-600">You have no new notifications right now.</p>
+            </div>
+          </section>
+        )}
+
+        {/* BOOKING SECTION (seat booking UI) */}
+        {activeSection === 'booking' && (
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold mb-6">Booking</h2>
+            <SeatBooking
+              userName={userName || user?.displayName || user?.name || 'Student'}
+              onBookingCreated={fetchBookings}
+            />
+          </section>
+        )}
+
+        {/* FEEDBACK SECTION */}
+        {activeSection === 'feedback' && (
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold mb-4">Feedback</h2>
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <form onSubmit={handleFeedbackSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Share your feedback
+                  </label>
+                  <textarea
+                    value={feedbackMessage}
+                    onChange={(e) => setFeedbackMessage(e.target.value)}
+                    rows={4}
+                    className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="Tell us about your experience..."
+                  />
+                </div>
+                {feedbackStatus && (
+                  <p className="text-sm text-blue-600">{feedbackStatus}</p>
+                )}
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+                >
+                  Submit Feedback
+                </button>
+              </form>
+            </div>
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
