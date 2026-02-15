@@ -356,13 +356,13 @@ export default function TeacherDashboard({ user, userName }) {
             {classes.length === 0 ? (
               <p className="text-gray-500">No admin-assigned classes yet.</p>
             ) : (
-              <div className="overflow-x-auto border border-blue-200 rounded-lg shadow-sm">
-                <table className="w-full table-fixed text-sm">
-                  <thead className="bg-blue-600 text-white">
+              <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <th className="text-left font-semibold px-3 py-2 border-b border-blue-500 w-36">Time</th>
+                      <th className="text-left font-semibold px-3 py-2 border-b border-gray-200">Time</th>
                       {FIXED_SCHEDULE_DAYS.map((day) => (
-                        <th key={day.dayOfWeek} className="text-left font-semibold px-3 py-2 border-b border-blue-500">
+                        <th key={day.dayOfWeek} className="text-left font-semibold px-3 py-2 border-b border-gray-200">
                           {day.label}
                         </th>
                       ))}
@@ -370,27 +370,39 @@ export default function TeacherDashboard({ user, userName }) {
                   </thead>
                   <tbody>
                     {FIXED_SCHEDULE_TIME_SLOTS.map((slot) => (
-                      <tr key={`${slot.startTime}-${slot.endTime}`} className="border-b border-blue-100 even:bg-blue-50/30">
-                        <td className="px-3 py-2 font-medium text-slate-700 bg-slate-50">{slot.label}</td>
+                      <tr key={`${slot.startTime}-${slot.endTime}`} className="border-b border-gray-100">
+                        <td className="px-3 py-2 font-medium text-gray-700">{slot.label}</td>
                         {FIXED_SCHEDULE_DAYS.map((day) => {
                           const key = `${day.dayOfWeek}|${slot.startTime}|${slot.endTime}`;
                           const entries = classLookup[key] || [];
                           const entry = entries[0] || null;
+                          const displayText = entry
+                            ? (entry.label || [entry.gradeLevel, entry.section, entry.teacherName].filter(Boolean).join(' - ') || 'Occupied')
+                            : 'Available';
+
                           return (
                             <td key={key} className="px-3 py-2 align-top">
-                              {entry ? (
-                                <div className="w-full min-h-[74px] border border-emerald-200 bg-emerald-50 rounded px-2 py-2 text-[11px] leading-4">
-                                  <p className="truncate"><span className="font-semibold text-emerald-800">Grade:</span> {entry.gradeLevel || entry.gradeLevelId || '-'}</p>
-                                  <p className="truncate"><span className="font-semibold text-emerald-800">Section:</span> {entry.section || entry.sectionId || '-'}</p>
-                                  <p className="truncate"><span className="font-semibold text-emerald-800">Teacher:</span> {entry.teacherName || '-'}</p>
-                                </div>
-                              ) : (
-                                <div className="w-full min-h-[74px] border border-gray-200 bg-white rounded px-2 py-2 text-[11px] text-gray-400">
-                                  <p>Grade: -</p>
-                                  <p>Section: -</p>
-                                  <p>Teacher: -</p>
-                                </div>
-                              )}
+                              <div
+                                className={`w-full min-h-[64px] text-left border rounded px-2 py-2 ${
+                                  entry
+                                    ? 'border-amber-300 bg-amber-50'
+                                    : 'border-gray-200 bg-white'
+                                }`}
+                              >
+                                <p className={`text-xs ${entry ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
+                                  {displayText}
+                                </p>
+                                {entry?.teacherName && (
+                                  <p className="text-[11px] text-gray-600 mt-1">
+                                    Teacher: {entry.teacherName}
+                                  </p>
+                                )}
+                                {entries.length > 1 && (
+                                  <p className="text-[11px] text-red-600 mt-1">
+                                    {entries.length} entries in this slot
+                                  </p>
+                                )}
+                              </div>
                             </td>
                           );
                         })}
