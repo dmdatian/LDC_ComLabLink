@@ -6,6 +6,7 @@ import { logoutUser } from '../utils/auth';
 import { db } from '../config/firebase';
 import { collection, deleteDoc, doc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 import logoName from '../assets/logo_name.png';
+import backgroundLdc from '../assets/background_ldc.jpg';
 
 const FIXED_SCHEDULE_TIME_SLOTS = [
   { startTime: '07:00', endTime: '08:00', label: '7:00am-8:00am' },
@@ -1905,10 +1906,15 @@ export default function AdminDashboard({ user, userName }) {
         : yearlyReport;
 
   return (
-    <div className="-m-6 min-h-[calc(100vh-64px)] flex overflow-hidden bg-slate-100">
+    <div
+      className="-m-6 h-[calc(100vh-64px)] flex overflow-hidden bg-cover bg-center"
+      style={{
+        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.58)), url(${backgroundLdc})`,
+      }}
+    >
 
       {/* SIDEBAR */}
-      <aside className="fixed left-0 inset-y-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto">
+      <aside className="fixed left-0 top-16 bottom-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto z-20">
         <div className="mb-3 rounded-lg bg-white p-2">
           <img
             src={logoName}
@@ -1917,7 +1923,7 @@ export default function AdminDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-sm text-blue-100 mb-8">{displayName}</p>
+        <p className="text-base text-blue-100 mb-8">{displayName}</p>
 
         <nav className="space-y-3">
           {['home', 'calendar', 'reports', 'sections', 'fixed-schedule', 'seats'].map((item) => (
@@ -1946,7 +1952,7 @@ export default function AdminDashboard({ user, userName }) {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="ml-64 flex-1 h-full overflow-y-auto p-8 bg-slate-100">
+      <main className="ml-64 flex-1 h-full overflow-y-auto p-8">
 
         {/* HEADER */}
         <section className="mb-10">
@@ -1965,7 +1971,7 @@ export default function AdminDashboard({ user, userName }) {
         {activeSection === 'home' && (
           <>
             {report && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 {[ 
                   ['Total Bookings', report.totalBookings, 'green'],
                   ['Approved', report.approvedBookings, 'yellow'],

@@ -4,6 +4,7 @@ import { seatsAPI, feedbackAPI, notificationAPI } from '../utils/api';
 import SeatBooking from '../components/SeatBooking';
 import { logoutUser } from '../utils/auth';
 import logoName from '../assets/logo_name.png';
+import backgroundLdc from '../assets/background_ldc.jpg';
 
 const FIXED_SCHEDULE_TIME_SLOTS = [
   { startTime: '07:00', endTime: '08:00', label: '7:00am-8:00am' },
@@ -102,8 +103,13 @@ export default function TeacherDashboard({ user, userName }) {
   }, {});
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden">
-      <aside className="fixed left-0 inset-y-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto">
+    <div
+      className="-m-6 h-[calc(100vh-64px)] flex overflow-hidden bg-cover bg-center"
+      style={{
+        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.58)), url(${backgroundLdc})`,
+      }}
+    >
+      <aside className="fixed left-0 top-16 bottom-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto z-20">
         <div className="mb-3 rounded-lg bg-white p-2">
           <img
             src={logoName}
@@ -112,7 +118,7 @@ export default function TeacherDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-sm text-blue-100 mb-8">
+        <p className="text-base text-blue-100 mb-8">
           {userName || user?.displayName || user?.name || 'Teacher'}
         </p>
 
@@ -145,7 +151,7 @@ export default function TeacherDashboard({ user, userName }) {
         </div>
       </aside>
 
-      <main className="ml-64 flex-1 h-full overflow-y-auto p-8 bg-white-100">
+      <main className="ml-64 flex-1 h-full overflow-y-auto p-8">
         {activeSection === 'home' && (
           <section className="mb-12">
             <h1 className="text-3xl font-bold mb-2">
