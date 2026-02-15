@@ -17,6 +17,7 @@ export default function StudentDashboard({ user, userName }) {
   const [activeSection, setActiveSection] = useState('home');
   const [pendingCancelId, setPendingCancelId] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   const toDate = (value) => {
@@ -99,7 +100,7 @@ export default function StudentDashboard({ user, userName }) {
     >
       
       {/* LEFT MENU */}
-      <aside className="fixed left-0 top-16 bottom-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto z-20">
+      <aside className={`fixed left-0 top-16 bottom-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto z-30 transform transition-transform duration-200 md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="mb-3 rounded-lg bg-white p-2">
           <img
             src={logoName}
@@ -114,7 +115,10 @@ export default function StudentDashboard({ user, userName }) {
 
         <nav className="space-y-3">
           <button
-            onClick={() => setActiveSection('home')}
+            onClick={() => {
+              setActiveSection('home');
+              setMobileMenuOpen(false);
+            }}
             className={`w-full text-left px-4 py-2 rounded transition ${
               activeSection === 'home' ? 'bg-blue-600' : 'hover:bg-blue-600'
             }`}
@@ -123,7 +127,10 @@ export default function StudentDashboard({ user, userName }) {
           </button>
 
           <button
-            onClick={() => setActiveSection('booking')}
+            onClick={() => {
+              setActiveSection('booking');
+              setMobileMenuOpen(false);
+            }}
             className={`w-full text-left px-4 py-2 rounded transition ${
               activeSection === 'booking' ? 'bg-blue-600' : 'hover:bg-blue-600'
             }`}
@@ -132,7 +139,10 @@ export default function StudentDashboard({ user, userName }) {
           </button>
 
           <button
-            onClick={() => setActiveSection('feedback')}
+            onClick={() => {
+              setActiveSection('feedback');
+              setMobileMenuOpen(false);
+            }}
             className={`w-full text-left px-4 py-2 rounded transition ${
               activeSection === 'feedback' ? 'bg-blue-600' : 'hover:bg-blue-600'
             }`}
@@ -151,8 +161,26 @@ export default function StudentDashboard({ user, userName }) {
         </div>
       </aside>
 
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 top-16 bg-black/40 z-20 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-label="Close menu overlay"
+        />
+      )}
+
       {/* MAIN CONTENT */}
-      <main className="ml-64 flex-1 h-full overflow-y-auto p-8">
+      <main className="ml-0 md:ml-64 flex-1 h-full overflow-y-auto p-4 md:p-8">
+        <div className="mb-4 md:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="bg-blue-700 text-white px-4 py-2 rounded-lg"
+          >
+            {mobileMenuOpen ? 'Close Menu' : 'Open Menu'}
+          </button>
+        </div>
         {/* HOME SECTION */}
         {activeSection === 'home' && (
           <section className="mb-10">

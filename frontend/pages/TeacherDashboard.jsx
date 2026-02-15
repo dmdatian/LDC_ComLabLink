@@ -38,6 +38,7 @@ export default function TeacherDashboard({ user, userName }) {
   const [notifications, setNotifications] = useState([]);
   const [activeSection, setActiveSection] = useState('home');
   const [pendingCancelId, setPendingCancelId] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -131,7 +132,7 @@ export default function TeacherDashboard({ user, userName }) {
         backgroundImage: `url(${backgroundLdc})`,
       }}
     >
-      <aside className="fixed left-0 top-16 bottom-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto z-20">
+      <aside className={`fixed left-0 top-16 bottom-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto z-30 transform transition-transform duration-200 md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="mb-3 rounded-lg bg-white p-2">
           <img
             src={logoName}
@@ -140,7 +141,7 @@ export default function TeacherDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-base text-blue-100 mb-8">
+        <p className="text-sm text-blue-100 mb-8">
           {userName || user?.displayName || user?.name || 'Teacher'}
         </p>
 
@@ -148,7 +149,10 @@ export default function TeacherDashboard({ user, userName }) {
           {['home', 'booking', 'classes', 'feedback'].map((section) => (
             <button
               key={section}
-              onClick={() => setActiveSection(section)}
+              onClick={() => {
+                setActiveSection(section);
+                setMobileMenuOpen(false);
+              }}
               className={`w-full text-left px-4 py-2 rounded transition ${
                 activeSection === section
                   ? 'bg-blue-600'
@@ -173,7 +177,25 @@ export default function TeacherDashboard({ user, userName }) {
         </div>
       </aside>
 
-      <main className="ml-64 flex-1 h-full overflow-y-auto p-8">
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 top-16 bg-black/40 z-20 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-label="Close menu overlay"
+        />
+      )}
+
+      <main className="ml-0 md:ml-64 flex-1 h-full overflow-y-auto p-4 md:p-8">
+        <div className="mb-4 md:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="bg-blue-700 text-white px-4 py-2 rounded-lg"
+          >
+            {mobileMenuOpen ? 'Close Menu' : 'Open Menu'}
+          </button>
+        </div>
         {activeSection === 'home' && (
           <section className="mb-12">
             <h1 className="text-3xl font-bold mb-2">
