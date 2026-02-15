@@ -141,7 +141,7 @@ export default function TeacherDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-sm text-blue-100 mb-8">
+        <p className="text-base text-blue-100 mb-8">
           {userName || user?.displayName || user?.name || 'Teacher'}
         </p>
 

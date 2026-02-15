@@ -2036,7 +2036,7 @@ export default function AdminDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-sm text-blue-100 mb-8">{displayName}</p>
+        <p className="text-base text-blue-100 mb-8">{displayName}</p>
 
         <nav className="space-y-3">
           {['home', 'calendar', 'reports', 'sections', 'fixed-schedule', 'seats'].map((item) => (
