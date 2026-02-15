@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const Class = require('../models/Class');
 const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
+const Notification = require('../models/Notification');
 const { db } = require('../config/database');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 const { validateBookingData } = require('../utils/validators');
@@ -17,6 +18,7 @@ const {
 
 const MAX_ACTIVE_BOOKINGS_PER_USER = 3;
 const MAX_BOOKINGS_PER_DAY_PER_USER = 2;
+const ATTENDANCE_CONFIRMATION_WINDOW_MINUTES = 15;
 
 const normalizeSeats = (value) => {
   if (!value) return [];
@@ -32,6 +34,89 @@ const toDate = (value) => {
   if (value.toDate) return value.toDate();
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatClock = (value) => {
+  const date = toDate(value);
+  if (!date) return '--:--';
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const getAttendanceDeadline = (booking) => {
+  const start = toDate(booking?.startTime);
+  if (!start) return null;
+  const stored = toDate(booking?.attendanceDeadlineAt);
+  if (stored) return stored;
+  return new Date(start.getTime() + ATTENDANCE_CONFIRMATION_WINDOW_MINUTES * 60 * 1000);
+};
+
+const createAttendanceNotification = async (booking, payload) => {
+  const userId = String(booking?.studentId || '').trim();
+  if (!userId) return;
+  await Notification.create({
+    userId,
+    bookingId: booking.id,
+    ...payload,
+  });
+};
+
+const applyAttendanceAutomation = async (bookings = [], opts = {}) => {
+  const now = new Date();
+  const reminderUserId = String(opts.reminderUserId || '').trim();
+
+  for (const booking of bookings) {
+    const currentStatus = String(booking?.status || '').toLowerCase();
+    if (currentStatus !== 'approved') continue;
+
+    const start = toDate(booking?.startTime);
+    const deadline = getAttendanceDeadline(booking);
+    if (!start || !deadline) continue;
+
+    const patch = {};
+    if (!booking.attendanceDeadlineAt) patch.attendanceDeadlineAt = deadline;
+
+    // Reminder only for the current viewer to avoid noisy mass notifications.
+    if (
+      reminderUserId &&
+      String(booking.studentId || '').trim() === reminderUserId &&
+      now >= start &&
+      now <= deadline &&
+      !booking.attendanceConfirmedAt &&
+      !booking.attendanceReminderNotifiedAt
+    ) {
+      patch.attendanceReminderNotifiedAt = now;
+    }
+
+    if (now > deadline && !booking.attendanceConfirmedAt) {
+      patch.status = 'absent';
+      patch.attendanceNoShowAt = now;
+      if (!booking.attendanceNoShowNotifiedAt) {
+        patch.attendanceNoShowNotifiedAt = now;
+      }
+    }
+
+    if (Object.keys(patch).length === 0) continue;
+    await Booking.update(booking.id, patch);
+    Object.assign(booking, patch);
+
+    if (patch.attendanceReminderNotifiedAt) {
+      await createAttendanceNotification(booking, {
+        title: 'Attendance Confirmation Needed',
+        message: `Confirm your attendance between ${formatClock(start)} and ${formatClock(deadline)}.`,
+        severity: 'warning',
+        type: 'attendance',
+      });
+    }
+
+    if (patch.status === 'absent' && patch.attendanceNoShowNotifiedAt) {
+      await createAttendanceNotification(booking, {
+        title: 'Marked Absent',
+        message: `No attendance confirmation was received within ${ATTENDANCE_CONFIRMATION_WINDOW_MINUTES} minutes from start time.`,
+        severity: 'warning',
+        type: 'attendance',
+      });
+    }
+  }
 };
 
 const DEFAULT_SEAT_CATALOG = [
@@ -303,6 +388,10 @@ exports.createBooking = async (req, res) => {
       });
     }
 
+    const attendanceDeadlineAt = new Date(
+      startDateTime.getTime() + ATTENDANCE_CONFIRMATION_WINDOW_MINUTES * 60 * 1000
+    );
+
     // --- Create booking ---
     const bookingResult = await Booking.create({
       studentId: req.user.uid,
@@ -319,6 +408,7 @@ exports.createBooking = async (req, res) => {
       sectionId: sectionId || null,
       section: section || null,
       status: 'approved',
+      attendanceDeadlineAt,
     });
 
     // --- Audit log ---
@@ -337,6 +427,7 @@ exports.createBooking = async (req, res) => {
       endTime,
       seats: normalizedSeats,
       status: 'approved',
+      attendanceDeadlineAt,
     }, 'Booking approved');
 
   } catch (error) {
@@ -352,6 +443,7 @@ exports.getSeatBookingsByDate = async (req, res) => {
     if (!date) return sendError(res, 400, 'Date is required');
 
     const bookings = await Booking.getByDate(date);
+    await applyAttendanceAutomation(bookings);
     const classes = await Class.getByDate(date);
     const seatCatalog = await getSeatCatalog();
     const seatBlocks = await getSeatBlocksForDate(date);
@@ -637,6 +729,7 @@ exports.deleteFixedScheduleEntry = async (req, res) => {
 exports.getMyBookings = async (req, res) => {
   try {
     const bookings = await Booking.getByStudentId(req.user.uid);
+    await applyAttendanceAutomation(bookings, { reminderUserId: req.user.uid });
     sendSuccess(res, 200, bookings, 'Bookings retrieved');
   } catch (error) {
     console.error('Get bookings error:', error);
@@ -682,11 +775,105 @@ exports.markAttendance = async (req, res) => {
       return sendError(res, 400, 'Status must be present or absent');
     }
 
-    await Booking.update(req.params.id, { status: nextStatus });
+    const patch = { status: nextStatus };
+    if (nextStatus === 'attended') {
+      patch.attendanceConfirmedAt = new Date();
+    }
+    if (nextStatus === 'absent') {
+      patch.attendanceNoShowAt = new Date();
+      if (!booking.attendanceNoShowNotifiedAt) {
+        patch.attendanceNoShowNotifiedAt = new Date();
+      }
+    }
+
+    await Booking.update(req.params.id, patch);
+
+    await createAttendanceNotification(booking, {
+      title: nextStatus === 'attended' ? 'Attendance Confirmed' : 'Attendance Marked Absent',
+      message: nextStatus === 'attended'
+        ? 'Your attendance was confirmed by admin.'
+        : 'Your attendance was marked absent by admin.',
+      severity: nextStatus === 'attended' ? 'info' : 'warning',
+      type: 'attendance',
+    });
+
     sendSuccess(res, 200, { id: req.params.id, status: nextStatus }, 'Attendance updated');
   } catch (error) {
     console.error('Mark attendance error:', error);
     sendError(res, 500, 'Failed to mark attendance', error.message);
+  }
+};
+
+// SEAT BOOKING: self confirm attendance (student/teacher)
+exports.confirmAttendance = async (req, res) => {
+  try {
+    const booking = await Booking.getById(req.params.id);
+    if (!booking) return sendError(res, 404, 'Booking not found');
+
+    const isOwner = String(booking.studentId || '').trim() === String(req.user.uid || '').trim();
+    const isAdmin = String(req.user.role || '').toLowerCase() === 'admin';
+    if (!isOwner && !isAdmin) return sendError(res, 403, 'Unauthorized');
+
+    const status = String(booking.status || '').toLowerCase();
+    if (['cancelled', 'rejected', 'absent'].includes(status)) {
+      return sendError(res, 409, `Cannot confirm attendance for status: ${status}`);
+    }
+    if (status === 'attended') {
+      return sendSuccess(res, 200, { id: booking.id, status: 'attended' }, 'Attendance already confirmed');
+    }
+
+    const start = toDate(booking.startTime);
+    const deadline = getAttendanceDeadline(booking);
+    if (!start || !deadline) {
+      return sendError(res, 400, 'Invalid booking time');
+    }
+
+    const now = new Date();
+    if (now < start) {
+      return sendError(
+        res,
+        409,
+        `Attendance confirmation starts at ${formatClock(start)}.`
+      );
+    }
+
+    if (now > deadline) {
+      const noShowPatch = {
+        status: 'absent',
+        attendanceNoShowAt: now,
+      };
+      if (!booking.attendanceNoShowNotifiedAt) {
+        noShowPatch.attendanceNoShowNotifiedAt = now;
+      }
+      await Booking.update(booking.id, noShowPatch);
+      if (!booking.attendanceNoShowNotifiedAt) {
+        await createAttendanceNotification(booking, {
+          title: 'Marked Absent',
+          message: `No attendance confirmation was received within ${ATTENDANCE_CONFIRMATION_WINDOW_MINUTES} minutes from start time.`,
+          severity: 'warning',
+          type: 'attendance',
+        });
+      }
+      return sendError(res, 409, 'Confirmation window expired. Booking marked absent.');
+    }
+
+    await Booking.update(booking.id, {
+      status: 'attended',
+      attendanceConfirmedAt: now,
+      attendanceDeadlineAt: deadline,
+    });
+
+    await createAttendanceNotification(booking, {
+      title: 'Attendance Confirmed',
+      message: 'Your attendance has been confirmed successfully.',
+      severity: 'info',
+      type: 'attendance',
+    });
+
+    sendSuccess(res, 200, { id: booking.id, status: 'attended' }, 'Attendance confirmed');
+  } catch (error) {
+    console.error('Confirm attendance error:', error);
+    sendError(res, 500, 'Failed to confirm attendance', error.message);
   }
 };
 
@@ -721,9 +908,11 @@ exports.getAllBookings = async (req, res) => {
 
     if (date) {
       bookings = await Booking.getByDate(date);
+      await applyAttendanceAutomation(bookings);
     } else {
       const snapshot = await require('../config/database').db.collection('seats').get();
       bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      await applyAttendanceAutomation(bookings);
     }
 
     sendSuccess(res, 200, bookings, 'Bookings retrieved');
