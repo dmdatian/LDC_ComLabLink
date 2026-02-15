@@ -15,10 +15,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #e9f2ff;
-  background-image: url('../assets/background_ldc.jpg');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
   min-height: 100vh;
 }
 
@@ -35,7 +31,6 @@ html, body, #root {
 .app-main {
   min-height: calc(100vh - 64px);
   padding: 24px;
-  backdrop-filter: saturate(1.05);
 }
 
 ::-webkit-scrollbar {

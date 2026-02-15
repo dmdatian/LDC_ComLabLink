@@ -1905,7 +1905,7 @@ export default function AdminDashboard({ user, userName }) {
         : yearlyReport;
 
   return (
-    <div className="min-h-screen flex overflow-hidden bg-slate-100">
+    <div className="-m-6 min-h-[calc(100vh-64px)] flex overflow-hidden bg-slate-100">
 
       {/* SIDEBAR */}
       <aside className="fixed left-0 inset-y-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto">
