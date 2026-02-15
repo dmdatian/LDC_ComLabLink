@@ -17,7 +17,7 @@ const {
 const Attendance = require('../models/Attendance');
 
 const MAX_ACTIVE_BOOKINGS_PER_USER = 3;
-const MAX_BOOKINGS_PER_DAY_PER_USER = 1;
+const MAX_BOOKINGS_PER_DAY_PER_USER = 2;
 
 const normalizeSeats = (value) => {
   if (!value) return [];
