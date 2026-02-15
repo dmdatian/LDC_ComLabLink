@@ -106,7 +106,7 @@ export default function TeacherDashboard({ user, userName }) {
     <div
       className="-m-6 h-[calc(100vh-64px)] flex overflow-hidden bg-cover bg-center"
       style={{
-        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.58)), url(${backgroundLdc})`,
+        backgroundImage: `url(${backgroundLdc})`,
       }}
     >
       <aside className="fixed left-0 top-16 bottom-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto z-20">

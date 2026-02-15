@@ -1909,7 +1909,7 @@ export default function AdminDashboard({ user, userName }) {
     <div
       className="-m-6 h-[calc(100vh-64px)] flex overflow-hidden bg-cover bg-center"
       style={{
-        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.58)), url(${backgroundLdc})`,
+        backgroundImage: `url(${backgroundLdc})`,
       }}
     >
 
