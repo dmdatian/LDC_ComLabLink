@@ -14,7 +14,6 @@ const {
   getFixedScheduleForDate,
   findFixedScheduleConflict,
 } = require('../utils/fixedSchedule');
-const Attendance = require('../models/Attendance');
 
 const MAX_ACTIVE_BOOKINGS_PER_USER = 3;
 const MAX_BOOKINGS_PER_DAY_PER_USER = 2;
@@ -198,7 +197,7 @@ exports.createBooking = async (req, res) => {
       return sendError(
         res,
         409,
-        'Booking limit reached. You can only create one booking per day.'
+        'Booking limit reached. You can only create up to 2 bookings per day.'
       );
     }
 
@@ -320,23 +319,6 @@ exports.createBooking = async (req, res) => {
       sectionId: sectionId || null,
       section: section || null,
       status: 'approved',
-    });
-
-    await Attendance.upsertFromBooking({
-      id: bookingResult.id,
-      studentId: req.user.uid,
-      studentName: name || req.user.name || 'Unknown',
-      teacherId: null,
-      teacherName: null,
-      date,
-      startTime: startDateTime,
-      endTime: endDateTime,
-      seats: normalizedSeats,
-      gradeLevelId: gradeLevelId || null,
-      gradeLevel: gradeLevel || null,
-      sectionId: sectionId || null,
-      section: section || null,
-      subject: subject || null,
     });
 
     // --- Audit log ---
@@ -690,8 +672,6 @@ exports.cancelBooking = async (req, res) => {
     }
 
     await Booking.update(req.params.id, { status: 'cancelled' });
-
-    await Attendance.markCancelled(req.params.id);
 
     sendSuccess(res, 200, {}, 'Booking cancelled');
   } catch (error) {
