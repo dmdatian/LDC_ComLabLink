@@ -85,7 +85,7 @@ const BOOKING_END_TIME_OPTIONS = [
   { value: '16:00', label: '4:00 PM' },
 ];
 
-export default function SeatBooking({ userName, onBookingCreated }) {
+export default function SeatBooking({ userName, onBookingCreated, hideAcademicFields = false }) {
   // STATE: form + availability
   const [name, setName] = useState(userName || '');
   const [selectedSeat, setSelectedSeat] = useState('');
@@ -323,8 +323,14 @@ export default function SeatBooking({ userName, onBookingCreated }) {
     const trimmedSubject = subject.trim();
     const selectedGrade = gradeLevels.find((item) => item.id === gradeLevelId);
     const selectedSection = sections.find((item) => item.id === sectionId);
+    const needsAcademicFields = !hideAcademicFields;
 
-    if (!trimmedName || !selectedSeat || !date || !startTime || !endTime || !trimmedPurpose || !trimmedSubject || !selectedGrade || !selectedSection) {
+    if (!trimmedName || !selectedSeat || !date || !startTime || !endTime || !trimmedPurpose || !trimmedSubject) {
+      setStatusMessage('Please fill all required fields and select a seat.');
+      return;
+    }
+
+    if (needsAcademicFields && (!selectedGrade || !selectedSection)) {
       setStatusMessage('Please fill all required fields and select a seat.');
       return;
     }
@@ -375,10 +381,10 @@ export default function SeatBooking({ userName, onBookingCreated }) {
         endTime: `${date}T${endTime}:00`,
         purpose: trimmedPurpose,
         subject: trimmedSubject,
-        gradeLevelId: selectedGrade.id,
-        gradeLevel: selectedGrade.name || selectedGrade.id,
-        sectionId: selectedSection.id,
-        section: selectedSection.name || selectedSection.id,
+        gradeLevelId: selectedGrade?.id || null,
+        gradeLevel: selectedGrade?.name || selectedGrade?.id || null,
+        sectionId: selectedSection?.id || null,
+        section: selectedSection?.name || selectedSection?.id || null,
       });
 
       if (createResponse?.data?.success === false) {
@@ -475,41 +481,45 @@ export default function SeatBooking({ userName, onBookingCreated }) {
           <input value={purpose} onChange={(e) => setPurpose(e.target.value)} />
         </div>
 
-        <div>
-          <label>Grade Level</label>
-          <select
-            value={gradeLevelId}
-            onChange={(e) => {
-              setGradeLevelId(e.target.value);
-              setSectionId('');
-            }}
-            required
-          >
-            <option value="">Select grade level</option>
-            {gradeLevels.map((grade) => (
-              <option key={grade.id} value={grade.id}>
-                {grade.name || grade.id}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!hideAcademicFields && (
+          <>
+            <div>
+              <label>Grade Level</label>
+              <select
+                value={gradeLevelId}
+                onChange={(e) => {
+                  setGradeLevelId(e.target.value);
+                  setSectionId('');
+                }}
+                required
+              >
+                <option value="">Select grade level</option>
+                {gradeLevels.map((grade) => (
+                  <option key={grade.id} value={grade.id}>
+                    {grade.name || grade.id}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div>
-          <label>Section</label>
-          <select
-            value={sectionId}
-            onChange={(e) => setSectionId(e.target.value)}
-            disabled={!gradeLevelId}
-            required
-          >
-            <option value="">{gradeLevelId ? 'Select section' : 'Select grade level first'}</option>
-            {filteredSections.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name || item.id}
-              </option>
-            ))}
-          </select>
-        </div>
+            <div>
+              <label>Section</label>
+              <select
+                value={sectionId}
+                onChange={(e) => setSectionId(e.target.value)}
+                disabled={!gradeLevelId}
+                required
+              >
+                <option value="">{gradeLevelId ? 'Select section' : 'Select grade level first'}</option>
+                {filteredSections.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name || item.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
 
         <div>
           <label>Start Time</label>

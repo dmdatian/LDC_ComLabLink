@@ -37,6 +37,7 @@ export default function TeacherDashboard({ user, userName }) {
   const [feedbackStatus, setFeedbackStatus] = useState('');
   const [notifications, setNotifications] = useState([]);
   const [activeSection, setActiveSection] = useState('home');
+  const [pendingCancelId, setPendingCancelId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -75,6 +76,27 @@ export default function TeacherDashboard({ user, userName }) {
   const handleLogout = async () => {
     await logoutUser();
     navigate('/login');
+  };
+
+  const handleCancelBooking = async (bookingId) => {
+    try {
+      await seatsAPI.cancelSeatBooking(bookingId);
+      await fetchBookings();
+      setPendingCancelId(null);
+    } catch (err) {
+      setError('Failed to cancel booking');
+      setPendingCancelId(null);
+    }
+  };
+
+  const toDate = (value) => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (value.seconds) return new Date(value.seconds * 1000);
+    if (value._seconds) return new Date(value._seconds * 1000);
+    if (value.toDate) return value.toDate();
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   };
 
   const handleFeedbackSubmit = (e) => {
@@ -118,7 +140,7 @@ export default function TeacherDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-base text-blue-100 mb-8">
+        <p className="text-sm text-blue-100 mb-8">
           {userName || user?.displayName || user?.name || 'Teacher'}
         </p>
 
@@ -218,8 +240,80 @@ export default function TeacherDashboard({ user, userName }) {
             <SeatBooking
               userName={userName || user?.displayName || user?.name || 'Teacher'}
               onBookingCreated={fetchBookings}
+              hideAcademicFields
             />
+
+            <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
+              <h3 className="text-xl font-bold mb-3">My Bookings</h3>
+              {bookings.length === 0 ? (
+                <p className="text-gray-600">No bookings yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {bookings.map((booking) => {
+                    const start = toDate(booking.startTime);
+                    const end = toDate(booking.endTime);
+                    const seats = Array.isArray(booking.seats)
+                      ? booking.seats
+                      : booking.seat
+                        ? [booking.seat]
+                        : [];
+                    const status = String(booking.status || 'pending').toLowerCase();
+                    const canCancel = !['cancelled', 'rejected', 'attended'].includes(status);
+
+                    return (
+                      <div key={booking.id} className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">
+                            {booking.date || '-'}{' '}
+                            {start ? start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            {' - '}
+                            {end ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          </p>
+                          <p className="text-sm text-gray-600">Seat: {seats.length > 0 ? seats.join(', ') : '-'}</p>
+                          <p className="text-xs text-gray-500 capitalize">Status: {status}</p>
+                        </div>
+
+                        {canCancel && (
+                          <button
+                            type="button"
+                            onClick={() => setPendingCancelId(booking.id)}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </section>
+        )}
+
+        {pendingCancelId && (
+          <div className="fixed inset-0 z-30 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl p-6 max-w-sm w-full">
+              <h3 className="text-lg font-bold mb-2">Cancel Booking</h3>
+              <p className="text-sm text-gray-600 mb-4">Are you sure you want to cancel this booking?</p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPendingCancelId(null)}
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-800"
+                >
+                  Keep
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCancelBooking(pendingCancelId)}
+                  className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white"
+                >
+                  Confirm Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeSection === 'classes' && (

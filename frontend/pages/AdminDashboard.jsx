@@ -988,6 +988,37 @@ export default function AdminDashboard({ user, userName }) {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   };
 
+  const formatClockTime = (value, fallbackDate, invalidLabel = '-') => {
+    if (!value) return invalidLabel;
+
+    if (typeof value === 'string') {
+      const directTime = value.match(/^(\d{2}:\d{2})/);
+      if (directTime) {
+        const [h, m] = directTime[1].split(':').map(Number);
+        const hour12 = ((h + 11) % 12) + 1;
+        const suffix = h >= 12 ? 'PM' : 'AM';
+        return `${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+      }
+
+      const isoTime = value.match(/T(\d{2}:\d{2})/);
+      if (isoTime) {
+        const [h, m] = isoTime[1].split(':').map(Number);
+        const hour12 = ((h + 11) % 12) + 1;
+        const suffix = h >= 12 ? 'PM' : 'AM';
+        return `${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+      }
+    }
+
+    const parsed = toDateObject(value, fallbackDate);
+    if (!parsed) return invalidLabel;
+
+    const h = parsed.getUTCHours();
+    const m = parsed.getUTCMinutes();
+    const hour12 = ((h + 11) % 12) + 1;
+    const suffix = h >= 12 ? 'PM' : 'AM';
+    return `${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+  };
+
   const toDateKey = (date) => {
     const d = toDateObject(date);
     if (!d) return null;
@@ -1285,6 +1316,15 @@ export default function AdminDashboard({ user, userName }) {
 
   const topTeachers = (() => {
     const map = {};
+    detailBookings.forEach(({ bookings }) => {
+      bookings.forEach((booking) => {
+        const role = String(booking.role || '').toLowerCase();
+        if (role !== 'teacher') return;
+        const key = booking.studentName || booking.teacherName || booking.teacherId || 'Unknown';
+        map[key] = (map[key] || 0) + 1;
+      });
+    });
+
     detailClasses.forEach(({ classes }) => {
       classes.forEach((cls) => {
         const key = cls.teacherName || cls.teacherId || 'Unknown';
@@ -1923,7 +1963,7 @@ export default function AdminDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-base text-blue-100 mb-8">{displayName}</p>
+        <p className="text-sm text-blue-100 mb-8">{displayName}</p>
 
         <nav className="space-y-3">
           {['home', 'calendar', 'reports', 'sections', 'fixed-schedule', 'seats'].map((item) => (
@@ -2044,8 +2084,8 @@ export default function AdminDashboard({ user, userName }) {
                 <div className="space-y-3">
                   {attendanceRows.map((row) => {
                     const bookingId = row.bookingId || row.id;
-                    const start = toDateObject(row.startTime, row.date);
-                    const end = toDateObject(row.endTime, row.date);
+                    const startLabel = formatClockTime(row.startTime, row.date);
+                    const endLabel = formatClockTime(row.endTime, row.date);
                     return (
                       <div
                         key={bookingId}
@@ -2054,9 +2094,9 @@ export default function AdminDashboard({ user, userName }) {
                         <div>
                           <p className="font-semibold">{row.studentName || 'Unknown student'}</p>
                           <p className="text-sm text-gray-600">
-                            {(start && start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) || '-'}
+                            {startLabel}
                             {' - '}
-                            {(end && end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) || '-'}
+                            {endLabel}
                           </p>
                           <p className="text-xs text-gray-500 capitalize">Status: {row.status || 'expected'}</p>
                         </div>
@@ -2114,8 +2154,8 @@ export default function AdminDashboard({ user, userName }) {
                     </thead>
                     <tbody>
                       {bookings.map((b) => {
-                        const start = toDateObject(b.startTime, b.date);
-                        const end = toDateObject(b.endTime, b.date);
+                        const startLabel = formatClockTime(b.startTime, b.date);
+                        const endLabel = formatClockTime(b.endTime, b.date);
                         const seats = Array.isArray(b.seats)
                           ? b.seats
                           : b.seat
@@ -2128,8 +2168,8 @@ export default function AdminDashboard({ user, userName }) {
                             <td className="px-3 py-2 whitespace-nowrap">{b.role || '-'}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{b.gradeLevel || b.gradeLevelId || '-'}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{b.section || b.sectionId || '-'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{start ? start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{end ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{startLabel}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{endLabel}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{seats.length > 0 ? seats.join(', ') : '-'}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{b.subject || '-'}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{b.purpose || '-'}</td>
@@ -2836,10 +2876,8 @@ export default function AdminDashboard({ user, userName }) {
                     <div key={block.id} className="border border-gray-100 rounded px-3 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                       <div>
                         {(() => {
-                          const start = toDateObject(block.startTime, block.date);
-                          const end = toDateObject(block.endTime, block.date);
-                          const startLabel = start ? start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Invalid';
-                          const endLabel = end ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Invalid';
+                          const startLabel = formatClockTime(block.startTime, block.date, 'Invalid');
+                          const endLabel = formatClockTime(block.endTime, block.date, 'Invalid');
                           return (
                             <p className="font-medium">
                               {block.seatId} {startLabel} - {endLabel}
