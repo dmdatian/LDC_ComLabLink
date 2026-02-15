@@ -1300,6 +1300,15 @@ export default function AdminDashboard({ user, userName }) {
     return peak.length === 0 ? hourlyBookingSeries : peak;
   })();
 
+  const formatHourLabel12h = (hour) => {
+    const normalized = Number(hour);
+    if (!Number.isFinite(normalized)) return '--';
+    const h = ((normalized % 24) + 24) % 24;
+    const suffix = h >= 12 ? 'PM' : 'AM';
+    const hour12 = ((h + 11) % 12) + 1;
+    return `${hour12}:00 ${suffix}`;
+  };
+
   const predictedPeakHours = (() => {
     const dayCount = detailBookings.length;
     if (dayCount === 0) return [];
@@ -1916,8 +1925,8 @@ export default function AdminDashboard({ user, userName }) {
                   <g key={item.hour}>
                     <circle cx={x} cy={y} r="3.5" fill="#1d4ed8" />
                     {isLabelHour && (
-                      <text x={x - 8} y="214" fontSize="10" fill="#475569">
-                        {String(item.hour).padStart(2, '0')}
+                      <text x={x - 16} y="214" fontSize="10" fill="#475569">
+                        {formatHourLabel12h(item.hour)}
                       </text>
                     )}
                   </g>
@@ -1925,21 +1934,21 @@ export default function AdminDashboard({ user, userName }) {
               })}
             </svg>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Hourly bookings (00 to 23)</p>
+          <p className="text-xs text-gray-500 mt-2">Hourly bookings (12-hour format)</p>
           <h4 className="text-sm font-semibold text-gray-700 mt-4 mb-2">Real Peak Hours</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4 text-sm">
             {peakHours.slice(0, 6).map((item) => (
               <div key={`peak-${item.hour}`} className="bg-blue-50 border border-blue-100 rounded px-3 py-2">
-                <span className="font-semibold">{String(item.hour).padStart(2, '0')}:00</span>
+                <span className="font-semibold">{formatHourLabel12h(item.hour)}</span>
                 <span className="text-gray-600"> - {item.value} bookings</span>
               </div>
             ))}
           </div>
-          <h4 className="text-sm font-semibold text-gray-700 mt-5 mb-2">Predicted Peak Hours (Next Day)</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mt-5 mb-2">ML Predicted Peak Hours (Next Day)</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
             {predictedPeakHours.map((item) => (
               <div key={`pred-peak-${item.hour}`} className="bg-emerald-50 border border-emerald-100 rounded px-3 py-2">
-                <span className="font-semibold">{String(item.hour).padStart(2, '0')}:00</span>
+                <span className="font-semibold">{formatHourLabel12h(item.hour)}</span>
                 <span className="text-gray-600"> - {item.value} predicted</span>
               </div>
             ))}
