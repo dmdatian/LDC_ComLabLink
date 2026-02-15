@@ -4,6 +4,12 @@ const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 
 const router = express.Router();
+const missingHandler = (name) => (req, res) => res.status(501).json({
+  success: false,
+  message: `${name} handler is not available in this deployment`,
+});
+const markAttendanceHandler = bookingController.markAttendance || missingHandler('markAttendance');
+const confirmAttendanceHandler = bookingController.confirmAttendance || missingHandler('confirmAttendance');
 
 // All booking routes require authentication
 router.use(authMiddleware);
@@ -26,7 +32,7 @@ router.get('/all', roleMiddleware(['admin']), bookingController.getAllBookings);
 router.get('/', roleMiddleware(['admin']), bookingController.getAllBookings);
 router.get('/:id', bookingController.getBookingById);
 router.patch('/:id/cancel', bookingController.cancelBooking); // more semantic
-router.patch('/:id/attendance', roleMiddleware(['admin']), bookingController.markAttendance);
-router.patch('/:id/confirm-attendance', bookingController.confirmAttendance);
+router.patch('/:id/attendance', roleMiddleware(['admin']), markAttendanceHandler);
+router.patch('/:id/confirm-attendance', confirmAttendanceHandler);
 
 module.exports = router;
