@@ -3,9 +3,15 @@ const notificationController = require('../controllers/notificationController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
-router.use(authMiddleware);
+const missingHandler = (name) => (req, res) => res.status(501).json({
+  success: false,
+  message: `${name} handler is not available in this deployment`,
+});
+const getMineHandler = notificationController.getMine || missingHandler('getMine');
+const markReadHandler = notificationController.markRead || missingHandler('markRead');
 
-router.get('/mine', notificationController.getMyNotifications);
-router.patch('/:id/read', notificationController.markMyNotificationRead);
+router.use(authMiddleware);
+router.get('/mine', getMineHandler);
+router.patch('/:id/read', markReadHandler);
 
 module.exports = router;
