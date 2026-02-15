@@ -1300,6 +1300,59 @@ export default function AdminDashboard({ user, userName }) {
     return peak.length === 0 ? hourlyBookingSeries : peak;
   })();
 
+  const predictedPeakHours = (() => {
+    const dayCount = detailBookings.length;
+    if (dayCount === 0) return [];
+
+    const hourlyByDay = Array.from({ length: 24 }, () => Array.from({ length: dayCount }, () => 0));
+
+    detailBookings.forEach(({ bookings }, dayIdx) => {
+      bookings.forEach((booking) => {
+        const status = (booking.status || '').toLowerCase();
+        if (status === 'cancelled' || status === 'rejected') return;
+
+        const start = toDateObject(
+          booking.startTime || booking.start || booking.time,
+          booking.date
+        );
+        if (!start) return;
+
+        const hour = start.getHours();
+        if (hour >= 0 && hour <= 23) {
+          hourlyByDay[hour][dayIdx] += 1;
+        }
+      });
+    });
+
+    const forecast = hourlyByDay.map((series, hour) => {
+      if (series.length === 1) return { hour, value: series[0] };
+
+      const n = series.length;
+      const xMean = (n - 1) / 2;
+      const yMean = series.reduce((sum, value) => sum + value, 0) / n;
+      let num = 0;
+      let den = 0;
+
+      series.forEach((value, idx) => {
+        const dx = idx - xMean;
+        num += dx * (value - yMean);
+        den += dx * dx;
+      });
+
+      const slope = den === 0 ? 0 : num / den;
+      const intercept = yMean - slope * xMean;
+      const nextValue = Math.max(0, Math.round(intercept + slope * n));
+      return { hour, value: nextValue };
+    });
+
+    const top = forecast
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+
+    return top.length > 0 ? top : forecast.slice(0, 6);
+  })();
+
   const topStudents = (() => {
     const map = {};
     detailBookings.forEach(({ bookings }) => {
@@ -1873,11 +1926,21 @@ export default function AdminDashboard({ user, userName }) {
             </svg>
           </div>
           <p className="text-xs text-gray-500 mt-2">Hourly bookings (00 to 23)</p>
+          <h4 className="text-sm font-semibold text-gray-700 mt-4 mb-2">Real Peak Hours</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4 text-sm">
             {peakHours.slice(0, 6).map((item) => (
               <div key={`peak-${item.hour}`} className="bg-blue-50 border border-blue-100 rounded px-3 py-2">
                 <span className="font-semibold">{String(item.hour).padStart(2, '0')}:00</span>
                 <span className="text-gray-600"> - {item.value} bookings</span>
+              </div>
+            ))}
+          </div>
+          <h4 className="text-sm font-semibold text-gray-700 mt-5 mb-2">ML Predicted Peak Hours (Next Day)</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+            {predictedPeakHours.map((item) => (
+              <div key={`pred-peak-${item.hour}`} className="bg-emerald-50 border border-emerald-100 rounded px-3 py-2">
+                <span className="font-semibold">{String(item.hour).padStart(2, '0')}:00</span>
+                <span className="text-gray-600"> - {item.value} predicted</span>
               </div>
             ))}
           </div>
@@ -1963,7 +2026,7 @@ export default function AdminDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-base text-blue-100 mb-8">{displayName}</p>
+        <p className="text-sm text-blue-100 mb-8">{displayName}</p>
 
         <nav className="space-y-3">
           {['home', 'calendar', 'reports', 'sections', 'fixed-schedule', 'seats'].map((item) => (
