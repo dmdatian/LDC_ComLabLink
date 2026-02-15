@@ -140,7 +140,7 @@ export default function TeacherDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-sm text-blue-100 mb-8">
+        <p className="text-base text-blue-100 mb-8">
           {userName || user?.displayName || user?.name || 'Teacher'}
         </p>
 
@@ -231,17 +231,6 @@ export default function TeacherDashboard({ user, userName }) {
                 </div>
               )}
             </div>
-          </section>
-        )}
-
-        {activeSection === 'booking' && (
-          <section className="mb-12">
-            <h2 className="text-2xl font-bold mb-6">Booking</h2>
-            <SeatBooking
-              userName={userName || user?.displayName || user?.name || 'Teacher'}
-              onBookingCreated={fetchBookings}
-              hideAcademicFields
-            />
 
             <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
               <h3 className="text-xl font-bold mb-3">My Bookings</h3>
@@ -288,6 +277,17 @@ export default function TeacherDashboard({ user, userName }) {
                 </div>
               )}
             </div>
+          </section>
+        )}
+
+        {activeSection === 'booking' && (
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold mb-6">Booking</h2>
+            <SeatBooking
+              userName={userName || user?.displayName || user?.name || 'Teacher'}
+              onBookingCreated={fetchBookings}
+              hideAcademicFields
+            />
           </section>
         )}
 

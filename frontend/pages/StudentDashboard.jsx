@@ -341,6 +341,60 @@ export default function StudentDashboard({ user, userName }) {
                 </div>
               )}
             </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
+              <h2 className="text-xl font-bold mb-2">My Bookings</h2>
+              {bookings.length === 0 ? (
+                <p className="text-gray-600">No bookings yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {bookings.map((booking) => {
+                    const startDateTime = booking.startTime
+                      ? toDate(booking.startTime)
+                      : booking.date && (booking.start || booking.startTime)
+                        ? new Date(`${booking.date}T${booking.start || booking.startTime}:00`)
+                        : null;
+                    const endDateTime = booking.endTime
+                      ? toDate(booking.endTime)
+                      : booking.date && (booking.end || booking.endTime)
+                        ? new Date(`${booking.date}T${booking.end || booking.endTime}:00`)
+                        : null;
+                    const seats = Array.isArray(booking.seats)
+                      ? booking.seats
+                      : booking.seat
+                        ? [booking.seat]
+                        : [];
+                    const status = String(booking.status || 'pending').toLowerCase();
+                    const canCancel = !['cancelled', 'rejected', 'attended'].includes(status);
+
+                    return (
+                      <div key={booking.id} className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">
+                            {booking.date || '-'}{' '}
+                            {startDateTime ? startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            {' - '}
+                            {endDateTime ? endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          </p>
+                          <p className="text-sm text-gray-600">Seat: {seats.length > 0 ? seats.join(', ') : '-'}</p>
+                          <p className="text-xs text-gray-500 capitalize">Status: {status}</p>
+                        </div>
+
+                        {canCancel && (
+                          <button
+                            type="button"
+                            onClick={() => setPendingCancelId(booking.id)}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </section>
         )}
 
