@@ -55,39 +55,6 @@ export default function StudentDashboard({ user, userName }) {
     }
   };
 
-  const getUpcomingBooking = () => {
-    const now = new Date();
-    const upcoming = bookings
-      .filter((booking) => {
-        const status = (booking.status || '').toLowerCase();
-        if (['cancelled', 'rejected'].includes(status)) return false;
-        const start = booking.startTime
-          ? toDate(booking.startTime)
-          : booking.date && booking.start
-            ? new Date(`${booking.date}T${booking.start}:00`)
-            : booking.date && booking.startTime
-              ? new Date(`${booking.date}T${booking.startTime}:00`)
-              : null;
-        if (!start) return false;
-        return start > now;
-      })
-      .sort((a, b) => {
-        const aStart = a.startTime
-          ? toDate(a.startTime)
-          : a.date && (a.start || a.startTime)
-            ? new Date(`${a.date}T${a.start || a.startTime}:00`)
-            : new Date(0);
-        const bStart = b.startTime
-          ? toDate(b.startTime)
-          : b.date && (b.start || b.startTime)
-            ? new Date(`${b.date}T${b.start || b.startTime}:00`)
-            : new Date(0);
-        return aStart - bStart;
-      });
-
-    return upcoming[0] || null;
-  };
-
   // BOOKINGS API: cancel
   const handleCancelBooking = async (bookingId) => {
     try {
@@ -141,7 +108,7 @@ export default function StudentDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-base text-blue-100 mb-8">
+        <p className="text-sm text-blue-100 mb-8">
           {userName || user?.displayName || user?.name || 'Student'}
         </p>
 
@@ -232,92 +199,6 @@ export default function StudentDashboard({ user, userName }) {
                 </div>
               </div>
             )}
-
-            <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-              <h2 className="text-xl font-bold mb-2">Upcoming Booking</h2>
-              {loading ? (
-                <p className="text-gray-500">Loading upcoming booking...</p>
-              ) : (() => {
-                const upcoming = getUpcomingBooking();
-                if (!upcoming) {
-                  return <p className="text-gray-600">No upcoming bookings.</p>;
-                }
-
-                const seats = Array.isArray(upcoming.seats)
-                  ? upcoming.seats
-                  : upcoming.seat
-                    ? [upcoming.seat]
-                    : [];
-
-                const startDateTime = upcoming.startTime
-                  ? toDate(upcoming.startTime)
-                  : upcoming.date && (upcoming.start || upcoming.startTime)
-                    ? new Date(`${upcoming.date}T${upcoming.start || upcoming.startTime}:00`)
-                    : null;
-                const endDateTime = upcoming.endTime
-                  ? toDate(upcoming.endTime)
-                  : upcoming.date && (upcoming.end || upcoming.endTime)
-                    ? new Date(`${upcoming.date}T${upcoming.end || upcoming.endTime}:00`)
-                    : null;
-
-                return (
-                  <div className="text-gray-700">
-                    <p className="font-semibold">
-                      {startDateTime
-                        ? startDateTime.toLocaleDateString()
-                        : (upcoming.date || 'Unknown date')}
-                      {startDateTime && endDateTime && (
-                        <> {' - '} {startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{' '}
-                          {endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</>
-                      )}
-                    </p>
-                    {seats.length > 0 && (
-                      <p>Seat: {seats.join(', ')}</p>
-                    )}
-                    {upcoming.subject && (
-                      <p>Subject: {upcoming.subject}</p>
-                    )}
-                    {upcoming.purpose && (
-                      <p>Purpose: {upcoming.purpose}</p>
-                    )}
-                    {upcoming.status && (
-                      <p className="capitalize">Status: {upcoming.status}</p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setPendingCancelId(upcoming.id)}
-                      className="mt-3 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
-                    >
-                      Cancel Booking
-                    </button>
-
-                    {pendingCancelId === upcoming.id && (
-                      <div className="mt-4 border border-red-200 bg-red-50 rounded-lg p-4">
-                        <p className="text-sm text-red-700 font-semibold mb-3">
-                          Cancel this booking?
-                        </p>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleCancelBooking(upcoming.id)}
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition"
-                          >
-                            Yes, cancel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPendingCancelId(null)}
-                            className="bg-white border border-red-200 text-red-700 px-3 py-1 rounded transition hover:bg-red-100"
-                          >
-                            No, keep it
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
 
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-bold mb-2">Notification</h2>
