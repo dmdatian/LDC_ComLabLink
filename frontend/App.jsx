@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { auth } from './config/firebase';
 import { updateProfile as updateFirebaseProfile } from 'firebase/auth';
 import LoginPage from './pages/LoginPage';
@@ -104,17 +104,21 @@ function App() {
     return <BookingPage user={user} />;
   };
 
-  return (
-    <Router>
-      <div className="min-h-screen">
-        {user && <Navbar user={user} userName={userName} />}
+  const AppShell = () => {
+    const location = useLocation();
+    const dashboardPaths = new Set(['/', '/student', '/teacher', '/admin']);
+    const isDashboardPath = dashboardPaths.has(location.pathname);
 
-        <main className="app-main">
+    return (
+      <>
+        {user && !isDashboardPath && <Navbar user={user} userName={userName} />}
+
+        <main className={isDashboardPath ? '' : 'app-main'}>
           <Routes>
             {/* Public Route */}
-            <Route 
-              path="/login" 
-              element={user ? <Navigate to="/" /> : <LoginPage />} 
+            <Route
+              path="/login"
+              element={user ? <Navigate to="/" /> : <LoginPage />}
             />
 
             {/* Protected Routes */}
@@ -128,6 +132,14 @@ function App() {
           <Route path="*" element={<Navigate to="/login" />} />
           </Routes>
         </main>
+      </>
+    );
+  };
+
+  return (
+    <Router>
+      <div className="min-h-screen">
+        <AppShell />
       </div>
     </Router>
   );

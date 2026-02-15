@@ -1905,7 +1905,7 @@ export default function AdminDashboard({ user, userName }) {
         : yearlyReport;
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden">
+    <div className="min-h-screen flex overflow-hidden bg-slate-100">
 
       {/* SIDEBAR */}
       <aside className="fixed left-0 inset-y-0 w-64 bg-blue-700 text-white flex flex-col px-6 pt-6 pb-6 overflow-y-auto">
@@ -1946,7 +1946,7 @@ export default function AdminDashboard({ user, userName }) {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="ml-64 flex-1 h-full overflow-y-auto p-8">
+      <main className="ml-64 flex-1 h-full overflow-y-auto p-8 bg-slate-100">
 
         {/* HEADER */}
         <section className="mb-10">
@@ -1966,8 +1966,7 @@ export default function AdminDashboard({ user, userName }) {
           <>
             {report && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                {[
-                  ['Total Classes', report.totalClasses, 'blue'],
+                {[ 
                   ['Total Bookings', report.totalBookings, 'green'],
                   ['Approved', report.approvedBookings, 'yellow'],
                   ['Attendance', report.attendedBookings, 'purple'],
