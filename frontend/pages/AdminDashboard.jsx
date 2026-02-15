@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import { useNavigate } from 'react-router-dom';
-import { seatsAPI, reportAPI, authAPI, feedbackAPI, classAPI } from '../utils/api';
+import { seatsAPI, reportAPI, authAPI, feedbackAPI, classAPI, attendanceAPI } from '../utils/api';
 import { logoutUser } from '../utils/auth';
 import { db } from '../config/firebase';
 import { collection, deleteDoc, doc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
@@ -110,9 +110,13 @@ export default function AdminDashboard({ user, userName }) {
   const [fixedScheduleGradeId, setFixedScheduleGradeId] = useState('');
   const [fixedScheduleSectionId, setFixedScheduleSectionId] = useState('');
   const [fixedScheduleTeacherId, setFixedScheduleTeacherId] = useState('');
+  const [attendanceRows, setAttendanceRows] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceError, setAttendanceError] = useState('');
 
   useEffect(() => {
     fetchDailyData();
+    fetchAttendance(selectedDate);
     fetchPendingUsers();
     refreshFeedback();
     fetchSectionData();
@@ -138,6 +142,29 @@ export default function AdminDashboard({ user, userName }) {
       setError(err.response?.data?.message || 'Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAttendance = async (date) => {
+    setAttendanceLoading(true);
+    setAttendanceError('');
+    try {
+      const response = await attendanceAPI.getByDate(date);
+      setAttendanceRows(response.data.data || []);
+    } catch (err) {
+      setAttendanceError(err.response?.data?.message || 'Failed to load attendance');
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
+  const handleMarkAttendance = async (bookingId, status) => {
+    try {
+      await attendanceAPI.mark(bookingId, status);
+      await fetchAttendance(selectedDate);
+      await fetchDailyData();
+    } catch (err) {
+      setAttendanceError(err.response?.data?.message || 'Failed to mark attendance');
     }
   };
 
@@ -859,6 +886,7 @@ export default function AdminDashboard({ user, userName }) {
   useEffect(() => {
     if (selectedDate) {
       fetchDailyData();
+      fetchAttendance(selectedDate);
     }
   }, [selectedDate]);
 
@@ -1993,6 +2021,58 @@ export default function AdminDashboard({ user, userName }) {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
+              <h2 className="text-2xl font-bold mb-4">Attendance Queue ({selectedDate})</h2>
+
+              {attendanceLoading && <p className="text-gray-500">Loading attendance...</p>}
+              {attendanceError && <p className="text-red-600">{attendanceError}</p>}
+
+              {!attendanceLoading && attendanceRows.length === 0 && (
+                <p className="text-gray-500">No attendance records for this date.</p>
+              )}
+
+              {!attendanceLoading && attendanceRows.length > 0 && (
+                <div className="space-y-3">
+                  {attendanceRows.map((row) => {
+                    const bookingId = row.bookingId || row.id;
+                    const start = toDateObject(row.startTime, row.date);
+                    const end = toDateObject(row.endTime, row.date);
+                    return (
+                      <div
+                        key={bookingId}
+                        className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                      >
+                        <div>
+                          <p className="font-semibold">{row.studentName || 'Unknown student'}</p>
+                          <p className="text-sm text-gray-600">
+                            {(start && start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) || '-'}
+                            {' - '}
+                            {(end && end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) || '-'}
+                          </p>
+                          <p className="text-xs text-gray-500 capitalize">Status: {row.status || 'expected'}</p>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleMarkAttendance(bookingId, 'present')}
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition"
+                          >
+                            Present
+                          </button>
+                          <button
+                            onClick={() => handleMarkAttendance(bookingId, 'absent')}
+                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition"
+                          >
+                            Absent
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

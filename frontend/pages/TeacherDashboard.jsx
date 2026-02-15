@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { seatsAPI, feedbackAPI } from '../utils/api';
+import { seatsAPI, feedbackAPI, notificationAPI } from '../utils/api';
 import SeatBooking from '../components/SeatBooking';
 import { logoutUser } from '../utils/auth';
 import logoName from '../assets/logo_name.png';
@@ -34,12 +34,14 @@ export default function TeacherDashboard({ user, userName }) {
   const [classError, setClassError] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackStatus, setFeedbackStatus] = useState('');
+  const [notifications, setNotifications] = useState([]);
   const [activeSection, setActiveSection] = useState('home');
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchBookings();
     fetchClasses();
+    fetchNotifications();
   }, []);
 
   const fetchBookings = async () => {
@@ -57,6 +59,15 @@ export default function TeacherDashboard({ user, userName }) {
       setClasses(response.data.data || []);
     } catch (err) {
       setClassError('Failed to load assigned class schedule');
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await notificationAPI.getMine(20);
+      setNotifications(response.data.data || []);
+    } catch (err) {
+      setNotifications([]);
     }
   };
 
@@ -172,7 +183,25 @@ export default function TeacherDashboard({ user, userName }) {
 
             <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
               <h2 className="text-xl font-bold mb-2">Notifications</h2>
-              <p className="text-gray-600">No new notifications yet.</p>
+              {notifications.length === 0 ? (
+                <p className="text-gray-600">No new notifications yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {notifications.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`border rounded px-3 py-2 ${
+                        entry.severity === 'warning'
+                          ? 'border-amber-300 bg-amber-50'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <p className="text-sm font-semibold">{entry.title || 'Notification'}</p>
+                      <p className="text-sm text-gray-700">{entry.message || '-'}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}

@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { seatsAPI } from '../utils/api';
+import { seatsAPI, feedbackAPI, notificationAPI } from '../utils/api';
 // BOOKING COMPONENT: add/replace your booking UI file here
 import SeatBooking from '../components/SeatBooking';
 import { logoutUser } from '../utils/auth';
-import { feedbackAPI } from '../utils/api';
 import logoName from '../assets/logo_name.png';
 
 export default function StudentDashboard({ user, userName }) {
@@ -16,6 +15,7 @@ export default function StudentDashboard({ user, userName }) {
   const [feedbackStatus, setFeedbackStatus] = useState('');
   const [activeSection, setActiveSection] = useState('home');
   const [pendingCancelId, setPendingCancelId] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const navigate = useNavigate();
 
   const toDate = (value) => {
@@ -30,6 +30,7 @@ export default function StudentDashboard({ user, userName }) {
   // EFFECTS: initial data
   useEffect(() => {
     fetchBookings();
+    fetchNotifications();
   }, []);
 
   // BOOKINGS API: fetch
@@ -41,6 +42,15 @@ export default function StudentDashboard({ user, userName }) {
       setError('Failed to load bookings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await notificationAPI.getMine(20);
+      setNotifications(response.data.data || []);
+    } catch (err) {
+      setNotifications([]);
     }
   };
 
@@ -305,7 +315,25 @@ export default function StudentDashboard({ user, userName }) {
 
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-bold mb-2">Notification</h2>
-              <p className="text-gray-600">You have no new notifications right now.</p>
+              {notifications.length === 0 ? (
+                <p className="text-gray-600">You have no new notifications right now.</p>
+              ) : (
+                <div className="space-y-2">
+                  {notifications.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`border rounded px-3 py-2 ${
+                        entry.severity === 'warning'
+                          ? 'border-amber-300 bg-amber-50'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <p className="text-sm font-semibold">{entry.title || 'Notification'}</p>
+                      <p className="text-sm text-gray-700">{entry.message || '-'}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}

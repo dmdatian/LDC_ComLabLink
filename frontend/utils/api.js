@@ -76,6 +76,19 @@ export const reportAPI = {
     api.get('/reports/monthly', { params: { month, year } }),
 };
 
+// ATTENDANCE API
+export const attendanceAPI = {
+  getByDate: (date) => api.get('/attendance', { params: { date } }),
+  mark: (bookingId, status, remarks = '') =>
+    api.patch(`/attendance/${bookingId}/mark`, { status, remarks }),
+};
+
+// NOTIFICATIONS API
+export const notificationAPI = {
+  getMine: (limit = 50) => api.get('/notifications/mine', { params: { limit } }),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+};
+
 // FEEDBACK API
 export const feedbackAPI = {
   submitFeedback: (message, category, source) =>
