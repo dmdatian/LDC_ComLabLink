@@ -40,6 +40,7 @@ export const seatsAPI = {
   getMySeats: () => api.get('/seats/mine'),
   getSeatById: (id) => api.get(`/seats/${id}`),
   cancelSeatBooking: (id) => api.patch(`/seats/${id}/cancel`),
+  confirmAttendance: (id) => api.patch(`/seats/${id}/confirm-attendance`),
   getAllSeats: (date) => api.get('/seats', { params: { date } }),
   getAllSeatsAdmin: () => api.get('/seats/all'),
   getSeatAvailability: (date, startTime, endTime) => api.get('/seats/availability', { params: { date, startTime, endTime } }),
@@ -78,9 +79,9 @@ export const reportAPI = {
 
 // ATTENDANCE API
 export const attendanceAPI = {
-  getByDate: (date) => api.get('/attendance', { params: { date } }),
+  getByDate: (date) => api.get('/seats', { params: { date } }),
   mark: (bookingId, status, remarks = '') =>
-    api.patch(`/attendance/${bookingId}/mark`, { status, remarks }),
+    api.patch(`/seats/${bookingId}/attendance`, { status, remarks }),
 };
 
 // NOTIFICATIONS API

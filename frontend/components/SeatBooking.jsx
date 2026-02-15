@@ -368,8 +368,8 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
         return booking?.date === date;
       }).length;
 
-      if (dailyBookingsCount >= 1) {
-        setStatusMessage('Booking limit reached. You can only create one booking per day.');
+      if (dailyBookingsCount >= 2) {
+        setStatusMessage('Booking limit reached. You can only create up to 2 bookings per day.');
         return;
       }
 

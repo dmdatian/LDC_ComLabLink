@@ -8,10 +8,9 @@ const classRoutes = require('./routes/classRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const subjectRoutes = require('./routes/subjectRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const errorHandler = require('./middleware/errorHandler');
 const { logInfo, logError } = require('./utils/logger');
-const attendanceRoutes = require('./routes/attendanceRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -36,7 +35,6 @@ app.use('/api/classes', classRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/subjects', subjectRoutes);
-app.use('/api/attendance', attendanceRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint

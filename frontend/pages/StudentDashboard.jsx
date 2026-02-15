@@ -29,10 +29,31 @@ export default function StudentDashboard({ user, userName }) {
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   };
+
+  const getAttendanceDeadline = (booking) => {
+    const start = toDate(booking?.startTime);
+    if (!start) return null;
+    const stored = toDate(booking?.attendanceDeadlineAt);
+    if (stored) return stored;
+    return new Date(start.getTime() + 15 * 60 * 1000);
+  };
+
+  const canConfirmAttendance = (booking) => {
+    const status = String(booking?.status || '').toLowerCase();
+    if (status !== 'approved') return false;
+    const now = new Date();
+    const start = toDate(booking?.startTime);
+    const deadline = getAttendanceDeadline(booking);
+    if (!start || !deadline) return false;
+    return now >= start && now <= deadline;
+  };
   // EFFECTS: initial data
   useEffect(() => {
-    fetchBookings();
-    fetchNotifications();
+    const load = async () => {
+      await fetchBookings();
+      await fetchNotifications();
+    };
+    load();
   }, []);
 
   // BOOKINGS API: fetch
@@ -65,6 +86,16 @@ export default function StudentDashboard({ user, userName }) {
     } catch (err) {
       setError('Failed to cancel booking');
       setPendingCancelId(null);
+    }
+  };
+
+  const handleConfirmAttendance = async (bookingId) => {
+    try {
+      await seatsAPI.confirmAttendance(bookingId);
+      await fetchBookings();
+      await fetchNotifications();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to confirm attendance');
     }
   };
 
@@ -109,7 +140,7 @@ export default function StudentDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-base text-blue-100 mb-8">
+        <p className="text-sm text-blue-100 mb-8">
           {userName || user?.displayName || user?.name || 'Student'}
         </p>
 
@@ -275,6 +306,7 @@ export default function StudentDashboard({ user, userName }) {
                         : [];
                     const status = String(booking.status || 'pending').toLowerCase();
                     const canCancel = !['cancelled', 'rejected', 'attended'].includes(status);
+                    const canConfirm = canConfirmAttendance(booking);
 
                     return (
                       <div key={booking.id} className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -289,15 +321,26 @@ export default function StudentDashboard({ user, userName }) {
                           <p className="text-xs text-gray-500 capitalize">Status: {status}</p>
                         </div>
 
-                        {canCancel && (
-                          <button
-                            type="button"
-                            onClick={() => setPendingCancelId(booking.id)}
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
-                          >
-                            Cancel
-                          </button>
-                        )}
+                        <div className="flex gap-2">
+                          {canConfirm && (
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmAttendance(booking.id)}
+                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition"
+                            >
+                              Confirm Attendance
+                            </button>
+                          )}
+                          {canCancel && (
+                            <button
+                              type="button"
+                              onClick={() => setPendingCancelId(booking.id)}
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

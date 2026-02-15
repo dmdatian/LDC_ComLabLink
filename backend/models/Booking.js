@@ -22,6 +22,11 @@ class Booking {
         sectionId: bookingData.sectionId || null,
         section: bookingData.section || null,
         status: bookingData.status || 'pending', // pending, approved, rejected, attended
+        attendanceDeadlineAt: bookingData.attendanceDeadlineAt ? new Date(bookingData.attendanceDeadlineAt) : null,
+        attendanceConfirmedAt: bookingData.attendanceConfirmedAt ? new Date(bookingData.attendanceConfirmedAt) : null,
+        attendanceReminderNotifiedAt: bookingData.attendanceReminderNotifiedAt ? new Date(bookingData.attendanceReminderNotifiedAt) : null,
+        attendanceNoShowAt: bookingData.attendanceNoShowAt ? new Date(bookingData.attendanceNoShowAt) : null,
+        attendanceNoShowNotifiedAt: bookingData.attendanceNoShowNotifiedAt ? new Date(bookingData.attendanceNoShowNotifiedAt) : null,
         rejectionReason: null,
         suggestedSlot: null,
         createdAt: new Date(),

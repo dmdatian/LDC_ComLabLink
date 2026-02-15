@@ -661,6 +661,35 @@ exports.getBookingById = async (req, res) => {
   }
 };
 
+// SEAT BOOKING: mark attendance (admin)
+exports.markAttendance = async (req, res) => {
+  try {
+    const booking = await Booking.getById(req.params.id);
+    if (!booking) return sendError(res, 404, 'Booking not found');
+
+    if (String(req.user.role || '').toLowerCase() !== 'admin') {
+      return sendError(res, 403, 'Only admins can mark attendance');
+    }
+
+    const rawStatus = String(req.body.status || '').trim().toLowerCase();
+    const nextStatus = rawStatus === 'present'
+      ? 'attended'
+      : rawStatus === 'absent'
+        ? 'absent'
+        : '';
+
+    if (!nextStatus) {
+      return sendError(res, 400, 'Status must be present or absent');
+    }
+
+    await Booking.update(req.params.id, { status: nextStatus });
+    sendSuccess(res, 200, { id: req.params.id, status: nextStatus }, 'Attendance updated');
+  } catch (error) {
+    console.error('Mark attendance error:', error);
+    sendError(res, 500, 'Failed to mark attendance', error.message);
+  }
+};
+
 // SEAT BOOKING: cancel
 exports.cancelBooking = async (req, res) => {
   try {
