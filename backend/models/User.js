@@ -62,6 +62,42 @@ class User {
     }
   }
 
+  // Get active users
+  static async getAllUsers() {
+    try {
+      const snapshot = await db.collection('users').get();
+      return snapshot.docs.map((doc) => doc.data());
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get deleted user records
+  static async getDeletedUsers() {
+    try {
+      const snapshot = await db.collection('deleted_users').get();
+      return snapshot.docs.map((doc) => doc.data());
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Archive deleted user for admin visibility/history
+  static async archiveDeletedUser(uid, userData, meta = {}) {
+    try {
+      const timestamp = new Date();
+      await db.collection('deleted_users').doc(uid).set({
+        uid,
+        ...userData,
+        deletedAt: timestamp,
+        deletedBy: meta.deletedBy || null,
+      }, { merge: true });
+      return { success: true };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Create a pending registration request (no Firebase Auth user yet)
   static async createPendingRequest(pendingData) {
     try {

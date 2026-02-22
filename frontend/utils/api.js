@@ -32,6 +32,9 @@ export const authAPI = {
   getPendingUsers: () => api.get('/auth/pending'),
   approveUser: (email) => api.put(`/auth/approve/${encodeURIComponent(email)}`),
   rejectUser: (email) => api.delete(`/auth/reject/${encodeURIComponent(email)}`),
+  getAllUsers: () => api.get('/auth/users'),
+  getDeletedUsers: () => api.get('/auth/users/deleted'),
+  deleteUserByUid: (uid) => api.delete(`/auth/users/${encodeURIComponent(uid)}`),
 };
 
 // SEATS (BOOKING) API

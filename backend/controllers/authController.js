@@ -299,6 +299,59 @@ exports.rejectUser = async (req, res) => {
   }
 };
 
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.getAllUsers();
+    sendSuccess(res, 200, users, 'Users retrieved');
+  } catch (error) {
+    console.error('Get users error:', error);
+    sendError(res, 500, 'Failed to get users', error.message);
+  }
+};
+
+exports.getDeletedUsers = async (req, res) => {
+  try {
+    const users = await User.getDeletedUsers();
+    sendSuccess(res, 200, users, 'Deleted users retrieved');
+  } catch (error) {
+    console.error('Get deleted users error:', error);
+    sendError(res, 500, 'Failed to get deleted users', error.message);
+  }
+};
+
+exports.deleteUserAccount = async (req, res) => {
+  try {
+    const { uid } = req.params;
+    if (!uid) return sendError(res, 400, 'UID is required');
+
+    if (uid === req.user.uid) {
+      return sendError(res, 400, 'You cannot delete your own account');
+    }
+
+    const existing = await User.getById(uid);
+    if (!existing) return sendError(res, 404, 'User not found');
+
+    await User.archiveDeletedUser(uid, existing, { deletedBy: req.user.uid });
+
+    try {
+      await auth.deleteUser(uid);
+    } catch (authErr) {
+      const code = authErr?.code || '';
+      // If auth record is already gone, continue removing Firestore user.
+      if (!code.includes('user-not-found')) {
+        throw authErr;
+      }
+    }
+
+    await User.delete(uid);
+
+    sendSuccess(res, 200, { uid }, 'User account deleted');
+  } catch (error) {
+    console.error('Delete user account error:', error);
+    sendError(res, 500, 'Failed to delete user account', error.message);
+  }
+};
+
 exports.getProfile = async (req, res) => {
   try {
     const user = await User.getById(req.user.uid);

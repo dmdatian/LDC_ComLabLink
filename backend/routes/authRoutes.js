@@ -17,6 +17,9 @@ router.put('/profile', authMiddleware, authController.updateProfile);
 router.get('/pending', authMiddleware, roleMiddleware(['admin']), authController.getPendingUsers);
 router.put('/approve/:email', authMiddleware, roleMiddleware(['admin']), authController.approveUser);
 router.delete('/reject/:email', authMiddleware, roleMiddleware(['admin']), authController.rejectUser);
+router.get('/users', authMiddleware, roleMiddleware(['admin']), authController.getAllUsers);
+router.get('/users/deleted', authMiddleware, roleMiddleware(['admin']), authController.getDeletedUsers);
+router.delete('/users/:uid', authMiddleware, roleMiddleware(['admin']), authController.deleteUserAccount);
 
 // Example admin-only route
 // router.put('/admin-update/:uid', authMiddleware, roleMiddleware(['admin']), authController.updateProfile);

@@ -50,6 +50,11 @@ export default function AdminDashboard({ user, userName }) {
   const [pendingUsers, setPendingUsers] = useState([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState('');
+  const [accountUsers, setAccountUsers] = useState([]);
+  const [deletedAccountUsers, setDeletedAccountUsers] = useState([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsError, setAccountsError] = useState('');
+  const [accountTab, setAccountTab] = useState('active');
   const [activeSection, setActiveSection] = useState('home');
   const [reportTab, setReportTab] = useState('weekly');
   const [weeklyRange, setWeeklyRange] = useState({
@@ -130,6 +135,12 @@ export default function AdminDashboard({ user, userName }) {
     }
   }, [activeSection, blockDate]);
 
+  useEffect(() => {
+    if (activeSection === 'accounts') {
+      fetchAccountsData();
+    }
+  }, [activeSection]);
+
   // REPORTS/BOOKINGS: daily data
   const fetchDailyData = async () => {
     setLoading(true);
@@ -181,6 +192,30 @@ export default function AdminDashboard({ user, userName }) {
       setPendingError(err.response?.data?.message || 'Failed to load pending users');
     } finally {
       setPendingLoading(false);
+    }
+  };
+
+  const fetchAccountsData = async () => {
+    setAccountsLoading(true);
+    setAccountsError('');
+    try {
+      const [activeResponse, deletedResponse] = await Promise.all([
+        authAPI.getAllUsers(),
+        authAPI.getDeletedUsers(),
+      ]);
+
+      const activeUsers = (activeResponse.data?.data || [])
+        .filter((item) => String(item.role || '').toLowerCase() !== 'admin')
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      const removedUsers = (deletedResponse.data?.data || [])
+        .sort((a, b) => String(b.deletedAt || '').localeCompare(String(a.deletedAt || '')));
+
+      setAccountUsers(activeUsers);
+      setDeletedAccountUsers(removedUsers);
+    } catch (err) {
+      setAccountsError(err.response?.data?.message || 'Failed to load accounts');
+    } finally {
+      setAccountsLoading(false);
     }
   };
 
@@ -824,6 +859,18 @@ export default function AdminDashboard({ user, userName }) {
     }
   };
 
+  const handleDeleteAccount = async (uid, label) => {
+    if (!window.confirm(`Delete account for ${label}? This removes login access.`)) return;
+    setAccountsError('');
+    try {
+      await authAPI.deleteUserByUid(uid);
+      await fetchAccountsData();
+      await fetchSectionData();
+    } catch (err) {
+      setAccountsError(err.response?.data?.message || 'Failed to delete account');
+    }
+  };
+
   const handleDateChange = (e) => {
     setSelectedDate(e.target.value);
   };
@@ -1432,6 +1479,19 @@ export default function AdminDashboard({ user, userName }) {
     summary.avgScore = detailFeedback.length > 0 ? Math.round((score / detailFeedback.length) * 100) : 0;
     return summary;
   })();
+  const sentimentBarWidth = feedbackSummary.total > 0
+    ? Math.max(Math.abs(feedbackSummary.avgScore), 2)
+    : 0;
+  const sentimentBarColor = feedbackSummary.avgScore > 0
+    ? 'bg-green-500'
+    : feedbackSummary.avgScore < 0
+      ? 'bg-red-500'
+      : 'bg-gray-400';
+  const sentimentScoreLabel = feedbackSummary.total === 0
+    ? 'No feedback data'
+    : feedbackSummary.avgScore === 0
+      ? '0% (balanced positive and negative)'
+      : `${feedbackSummary.avgScore}% (positive to negative scale)`;
 
   const statusColors = {
     pending: 'bg-yellow-400',
@@ -1480,11 +1540,11 @@ export default function AdminDashboard({ user, userName }) {
             <p className="text-sm text-gray-600 mb-2">Average sentiment score</p>
             <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
               <div
-                className={`h-3 ${feedbackSummary.avgScore >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                style={{ width: `${Math.min(Math.abs(feedbackSummary.avgScore), 100)}%` }}
+                className={`h-3 ${sentimentBarColor}`}
+                style={{ width: `${Math.min(sentimentBarWidth, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-2">{feedbackSummary.avgScore}% (positive to negative scale)</p>
+            <p className="text-xs text-gray-500 mt-2">{sentimentScoreLabel}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1537,41 +1597,10 @@ export default function AdminDashboard({ user, userName }) {
 
   const formatFeedbackDate = (value) => {
     if (!value) return '—';
-    const date = new Date(value);
+    const date = toDateObject(value);
+    if (!date) return '—';
     return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
   };
-
-  const FeedbackPanel = () => (
-    <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold">Feedback</h3>
-        <button
-          onClick={refreshFeedback}
-          className="text-sm text-blue-600 hover:text-blue-700"
-        >
-          Refresh
-        </button>
-      </div>
-
-      {feedbackEntries.length === 0 ? (
-        <p className="text-gray-600">No feedback submitted yet.</p>
-      ) : (
-        <div className="space-y-4">
-          {feedbackEntries.map((entry) => (
-            <div key={entry.id} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-1">
-                <p className="font-semibold">{entry.name || 'Anonymous'}</p>
-                <p className="text-xs text-gray-500">
-                  {formatFeedbackDate(entry.createdAt)}
-                </p>
-              </div>
-              <p className="text-gray-700 mt-2">{entry.message}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 
   const handleDownloadReport = () => {
     if (!activeReportData) return;
@@ -2043,7 +2072,7 @@ export default function AdminDashboard({ user, userName }) {
         <p className="text-sm text-blue-100 mb-8">{displayName}</p>
 
         <nav className="space-y-3">
-          {['home', 'calendar', 'reports', 'sections', 'fixed-schedule', 'seats'].map((item) => (
+          {['home', 'calendar', 'reports', 'accounts', 'sections', 'fixed-schedule', 'seats'].map((item) => (
             <button
               key={item}
               onClick={() => {
@@ -2409,7 +2438,90 @@ export default function AdminDashboard({ user, userName }) {
               {reportTab === 'monthly' && <ReportGraph data={monthlyReport} />}
               {reportTab === 'yearly' && <ReportGraph data={yearlyReport} />}
               <DetailCharts />
-              <FeedbackPanel />
+            </div>
+          </>
+        )}
+
+        {/* ACCOUNTS */}
+        {activeSection === 'accounts' && (
+          <>
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                <h2 className="text-2xl font-bold">Account Management</h2>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAccountTab('active')}
+                    className={`px-3 py-2 rounded ${accountTab === 'active' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  >
+                    Active Accounts
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccountTab('deleted')}
+                    className={`px-3 py-2 rounded ${accountTab === 'deleted' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  >
+                    Deleted Accounts
+                  </button>
+                </div>
+              </div>
+
+              {accountsError && (
+                <div className="mb-4 bg-red-100 border border-red-300 text-red-700 px-4 py-2 rounded">
+                  {accountsError}
+                </div>
+              )}
+
+              {accountsLoading ? (
+                <p className="text-gray-500">Loading accounts...</p>
+              ) : accountTab === 'active' ? (
+                accountUsers.length === 0 ? (
+                  <p className="text-gray-500">No active accounts found.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {accountUsers.map((acct) => (
+                      <div
+                        key={acct.uid}
+                        className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                      >
+                        <div>
+                          <p className="font-semibold">{acct.name || acct.email || acct.uid}</p>
+                          <p className="text-sm text-gray-600">{acct.email || '-'}</p>
+                          <p className="text-xs text-gray-500 capitalize">
+                            {acct.role || 'user'} • {acct.status || 'approved'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAccount(acct.uid, acct.name || acct.email || acct.uid)}
+                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded transition"
+                        >
+                          Delete Account
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : (
+                deletedAccountUsers.length === 0 ? (
+                  <p className="text-gray-500">No deleted accounts yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {deletedAccountUsers.map((acct) => (
+                      <div
+                        key={acct.uid}
+                        className="border border-gray-200 rounded-lg p-4"
+                      >
+                        <p className="font-semibold">{acct.name || acct.email || acct.uid}</p>
+                        <p className="text-sm text-gray-600">{acct.email || '-'}</p>
+                        <p className="text-xs text-gray-500 capitalize">
+                          {acct.role || 'user'} • Deleted: {formatFeedbackDate(acct.deletedAt)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
             </div>
           </>
         )}
