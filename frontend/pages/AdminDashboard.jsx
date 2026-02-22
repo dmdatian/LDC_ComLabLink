@@ -1367,6 +1367,10 @@ export default function AdminDashboard({ user, userName }) {
     const map = {};
     detailBookings.forEach(({ bookings }) => {
       bookings.forEach((booking) => {
+        const role = String(booking.role || '').toLowerCase();
+        // Only include student bookings; prevent teacher entries from leaking here.
+        if (role && role !== 'student') return;
+        if (!role && (booking.teacherId || booking.teacherName)) return;
         const name = booking.studentName || 'Unknown';
         map[name] = (map[name] || 0) + 1;
       });
@@ -2036,7 +2040,7 @@ export default function AdminDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-base text-blue-100 mb-8">{displayName}</p>
+        <p className="text-sm text-blue-100 mb-8">{displayName}</p>
 
         <nav className="space-y-3">
           {['home', 'calendar', 'reports', 'sections', 'fixed-schedule', 'seats'].map((item) => (
