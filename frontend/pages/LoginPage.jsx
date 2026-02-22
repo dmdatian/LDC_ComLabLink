@@ -200,7 +200,7 @@ export default function LoginPage() {
     >
       <div className="mx-auto flex min-h-full w-full items-center justify-center">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl lg:grid lg:max-w-6xl lg:grid-cols-[1.2fr_0.9fr]">
-          <section className="hidden border-b border-slate-200 p-6 md:p-8 lg:block lg:border-b-0 lg:border-r">
+          <section className="border-b border-slate-200 p-6 md:p-8 lg:border-b-0 lg:border-r">
           <div className="mb-10">
             <img
               src={logoName}
