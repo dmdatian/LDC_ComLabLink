@@ -34,6 +34,12 @@ export default function AdminDashboard({ user, userName }) {
   // STATE: bookings/reports/users/feedback
   const navigate = useNavigate();
   const displayName = userName || user?.displayName || user?.name || 'Admin';
+  const toLocalDateKey = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
   const computeWeeklyEndDate = (startDate) => {
     if (!startDate) return '';
     const start = new Date(`${startDate}T00:00:00Z`);
@@ -41,10 +47,10 @@ export default function AdminDashboard({ user, userName }) {
     start.setUTCDate(start.getUTCDate() + 7);
     return start.toISOString().split('T')[0];
   };
-  const defaultWeeklyStartDate = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const defaultWeeklyStartDate = toLocalDateKey(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
   const [bookings, setBookings] = useState([]);
   const [report, setReport] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(toLocalDateKey());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [pendingUsers, setPendingUsers] = useState([]);
@@ -102,7 +108,7 @@ export default function AdminDashboard({ user, userName }) {
   const [seatAdminMessage, setSeatAdminMessage] = useState('');
   const [insertSeatRow, setInsertSeatRow] = useState('');
   const [insertSeatColumn, setInsertSeatColumn] = useState('');
-  const [blockDate, setBlockDate] = useState(new Date().toISOString().split('T')[0]);
+  const [blockDate, setBlockDate] = useState(toLocalDateKey());
   const [newBlockSeatId, setNewBlockSeatId] = useState('');
   const [newBlockStartTime, setNewBlockStartTime] = useState('');
   const [newBlockEndTime, setNewBlockEndTime] = useState('');
@@ -163,7 +169,10 @@ export default function AdminDashboard({ user, userName }) {
     setAttendanceError('');
     try {
       const response = await attendanceAPI.getByDate(date);
-      setAttendanceRows(response.data.data || []);
+      const rows = Array.isArray(response.data.data) ? response.data.data : [];
+      setAttendanceRows(
+        rows.filter((row) => String(row?.status || '').toLowerCase() !== 'cancelled')
+      );
     } catch (err) {
       setAttendanceError(err.response?.data?.message || 'Failed to load attendance');
     } finally {

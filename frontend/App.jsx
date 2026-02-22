@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { auth } from './config/firebase';
 import { updateProfile as updateFirebaseProfile } from 'firebase/auth';
@@ -13,11 +13,13 @@ import { logoutUser } from './utils/auth';
 import './styles/index.css'; // 👈 IMPORTANT
 
 function App() {
+  const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('');
   const [userRole, setUserRole] = useState(null);
   const [accountStatus, setAccountStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const inactivityTimerRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -71,6 +73,42 @@ function App() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+      return undefined;
+    }
+
+    const resetInactivityTimer = () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      inactivityTimerRef.current = setTimeout(async () => {
+        await logoutUser();
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, resetInactivityTimer, { passive: true });
+    });
+
+    resetInactivityTimer();
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, resetInactivityTimer);
+      });
+    };
+  }, [user]);
 
   if (loading) {
     return (

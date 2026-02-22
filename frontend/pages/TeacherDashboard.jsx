@@ -31,6 +31,13 @@ const FIXED_SCHEDULE_DAYS = [
 const TERMINAL_BOOKING_STATUSES = new Set(['cancelled', 'rejected', 'attended', 'absent', 'missed']);
 
 export default function TeacherDashboard({ user, userName }) {
+  const toLocalDateKey = (dateObj = new Date()) => {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [bookings, setBookings] = useState([]);
   const [classes, setClasses] = useState([]);
   const [error, setError] = useState('');
@@ -259,7 +266,7 @@ export default function TeacherDashboard({ user, userName }) {
                 value={bookings.filter(
                   (b) =>
                     b.date ===
-                    new Date().toISOString().split('T')[0]
+                    toLocalDateKey()
                 ).length}
               />
             </div>

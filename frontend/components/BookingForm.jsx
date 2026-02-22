@@ -12,6 +12,13 @@ const isWeekendDate = (dateKey) => {
 };
 
 export default function BookingForm({ onBookingCreated }) {
+  const toLocalDateKey = (dateObj = new Date()) => {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -98,7 +105,7 @@ export default function BookingForm({ onBookingCreated }) {
                   }
                 }}
                 required
-                min={new Date().toISOString().split('T')[0]}
+                min={toLocalDateKey()}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
               />
           </div>

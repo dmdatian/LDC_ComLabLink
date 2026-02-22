@@ -96,6 +96,13 @@ const isWeekendDate = (dateKey) => {
 };
 
 export default function SeatBooking({ userName, onBookingCreated, hideAcademicFields = false }) {
+  const toLocalDateKey = (dateObj = new Date()) => {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // STATE: form + availability
   const [name, setName] = useState(userName || '');
   const [selectedSeat, setSelectedSeat] = useState('');
@@ -476,7 +483,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
           <input
             type="date"
             value={date}
-            min={new Date().toISOString().split('T')[0]}
+            min={toLocalDateKey()}
             onChange={(e) => {
               const nextDate = e.target.value;
               setDate(nextDate);
