@@ -16,9 +16,11 @@ const {
   findFixedScheduleConflict,
 } = require('../utils/fixedSchedule');
 
-const MAX_ACTIVE_BOOKINGS_PER_USER = 3;
 const MAX_BOOKINGS_PER_DAY_PER_USER = 2;
 const ATTENDANCE_CONFIRMATION_WINDOW_MINUTES = 15;
+const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'approved']);
+
+const isActiveBookingStatus = (status) => ACTIVE_BOOKING_STATUSES.has(String(status || '').toLowerCase());
 
 const normalizeSeats = (value) => {
   if (!value) return [];
@@ -88,7 +90,7 @@ const applyAttendanceAutomation = async (bookings = [], opts = {}) => {
     }
 
     if (now > deadline && !booking.attendanceConfirmedAt) {
-      patch.status = 'absent';
+      patch.status = 'missed';
       patch.attendanceNoShowAt = now;
       if (!booking.attendanceNoShowNotifiedAt) {
         patch.attendanceNoShowNotifiedAt = now;
@@ -108,9 +110,9 @@ const applyAttendanceAutomation = async (bookings = [], opts = {}) => {
       });
     }
 
-    if (patch.status === 'absent' && patch.attendanceNoShowNotifiedAt) {
+    if (patch.status === 'missed' && patch.attendanceNoShowNotifiedAt) {
       await createAttendanceNotification(booking, {
-        title: 'Marked Absent',
+        title: 'Marked Missed',
         message: `No attendance confirmation was received within ${ATTENDANCE_CONFIRMATION_WINDOW_MINUTES} minutes from start time.`,
         severity: 'warning',
         type: 'attendance',
@@ -259,22 +261,10 @@ exports.createBooking = async (req, res) => {
     }
 
     const existingUserBookings = await Booking.getByStudentId(req.user.uid);
-    const activeBookingsCount = existingUserBookings.filter((booking) => {
-      const status = String(booking?.status || '').toLowerCase();
-      return status !== 'cancelled' && status !== 'rejected';
-    }).length;
-
-    if (activeBookingsCount >= MAX_ACTIVE_BOOKINGS_PER_USER) {
-      return sendError(
-        res,
-        409,
-        `Booking limit reached. You can only have up to ${MAX_ACTIVE_BOOKINGS_PER_USER} active bookings.`
-      );
-    }
+    await applyAttendanceAutomation(existingUserBookings, { reminderUserId: req.user.uid });
 
     const dailyBookingsCount = existingUserBookings.filter((booking) => {
-      const status = String(booking?.status || '').toLowerCase();
-      if (status === 'cancelled' || status === 'rejected') return false;
+      if (!isActiveBookingStatus(booking?.status)) return false;
       return booking?.date === date;
     }).length;
 
@@ -350,7 +340,7 @@ exports.createBooking = async (req, res) => {
       const existingBookings = await Booking.getByDate(date);
       const conflict = existingBookings.find((booking) => {
         const status = (booking.status || '').toLowerCase();
-        if (status === 'cancelled' || status === 'rejected') return false;
+        if (!isActiveBookingStatus(status)) return false;
 
         const bookedStart = toDate(booking.startTime);
         const bookedEnd = toDate(booking.endTime);
@@ -815,7 +805,7 @@ exports.confirmAttendance = async (req, res) => {
     if (!isOwner && !isAdmin) return sendError(res, 403, 'Unauthorized');
 
     const status = String(booking.status || '').toLowerCase();
-    if (['cancelled', 'rejected', 'absent'].includes(status)) {
+    if (['cancelled', 'rejected', 'absent', 'missed'].includes(status)) {
       return sendError(res, 409, `Cannot confirm attendance for status: ${status}`);
     }
     if (status === 'attended') {
@@ -839,7 +829,7 @@ exports.confirmAttendance = async (req, res) => {
 
     if (now > deadline) {
       const noShowPatch = {
-        status: 'absent',
+        status: 'missed',
         attendanceNoShowAt: now,
       };
       if (!booking.attendanceNoShowNotifiedAt) {
@@ -848,7 +838,7 @@ exports.confirmAttendance = async (req, res) => {
       await Booking.update(booking.id, noShowPatch);
       if (!booking.attendanceNoShowNotifiedAt) {
         await createAttendanceNotification(booking, {
-          title: 'Marked Absent',
+          title: 'Marked Missed',
           message: `No attendance confirmation was received within ${ATTENDANCE_CONFIRMATION_WINDOW_MINUTES} minutes from start time.`,
           severity: 'warning',
           type: 'attendance',

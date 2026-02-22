@@ -28,6 +28,8 @@ const FIXED_SCHEDULE_DAYS = [
   { dayOfWeek: 5, label: 'Friday' },
 ];
 
+const TERMINAL_BOOKING_STATUSES = new Set(['cancelled', 'rejected', 'attended', 'absent', 'missed']);
+
 export default function TeacherDashboard({ user, userName }) {
   const [bookings, setBookings] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -172,7 +174,7 @@ export default function TeacherDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-base text-blue-100 mb-8">
+        <p className="text-sm text-blue-100 mb-8">
           {userName || user?.displayName || user?.name || 'Teacher'}
         </p>
 
@@ -247,7 +249,9 @@ export default function TeacherDashboard({ user, userName }) {
               <StatCard
                 label="Upcoming"
                 value={bookings.filter(
-                  (b) => new Date(b.startTime) > new Date()
+                  (b) =>
+                    !TERMINAL_BOOKING_STATUSES.has(String(b?.status || '').toLowerCase())
+                    && new Date(b.startTime) > new Date()
                 ).length}
               />
               <StatCard
@@ -300,7 +304,7 @@ export default function TeacherDashboard({ user, userName }) {
                         ? [booking.seat]
                         : [];
                     const status = String(booking.status || 'pending').toLowerCase();
-                    const canCancel = !['cancelled', 'rejected', 'attended'].includes(status);
+                    const canCancel = !TERMINAL_BOOKING_STATUSES.has(status);
                     const canConfirm = canConfirmAttendance(booking);
 
                     return (

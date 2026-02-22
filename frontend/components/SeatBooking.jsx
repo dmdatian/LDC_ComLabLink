@@ -85,6 +85,9 @@ const BOOKING_END_TIME_OPTIONS = [
   { value: '16:00', label: '4:00 PM' },
 ];
 
+const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'approved']);
+const isActiveBookingStatus = (status) => ACTIVE_BOOKING_STATUSES.has(String(status || '').toLowerCase());
+
 export default function SeatBooking({ userName, onBookingCreated, hideAcademicFields = false }) {
   // STATE: form + availability
   const [name, setName] = useState(userName || '');
@@ -270,7 +273,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       // Check seat bookings
       bookings.forEach((booking) => {
         const status = (booking.status || '').toLowerCase();
-        if (status === 'cancelled' || status === 'rejected') return;
+        if (!isActiveBookingStatus(status)) return;
 
         const bookedStart = toTimeFloat(booking.startTime);
         const bookedEnd = toTimeFloat(booking.endTime);
@@ -352,19 +355,9 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
     try {
       const myBookingsResponse = await seatsAPI.getMySeats();
       const myBookings = Array.isArray(myBookingsResponse?.data?.data) ? myBookingsResponse.data.data : [];
-      const activeBookingsCount = myBookings.filter((booking) => {
-        const status = String(booking?.status || '').toLowerCase();
-        return status !== 'cancelled' && status !== 'rejected';
-      }).length;
-
-      if (activeBookingsCount >= 3) {
-        setStatusMessage('Booking limit reached. You can only have up to 3 active bookings.');
-        return;
-      }
 
       const dailyBookingsCount = myBookings.filter((booking) => {
-        const status = String(booking?.status || '').toLowerCase();
-        if (status === 'cancelled' || status === 'rejected') return false;
+        if (!isActiveBookingStatus(booking?.status)) return false;
         return booking?.date === date;
       }).length;
 

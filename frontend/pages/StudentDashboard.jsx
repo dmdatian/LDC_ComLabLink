@@ -7,6 +7,8 @@ import { logoutUser } from '../utils/auth';
 import logoName from '../assets/logo_name.png';
 import backgroundLdc from '../assets/background_ldc.jpg';
 
+const TERMINAL_BOOKING_STATUSES = new Set(['cancelled', 'rejected', 'attended', 'absent', 'missed']);
+
 export default function StudentDashboard({ user, userName }) {
   // STATE: bookings + UI
   const [bookings, setBookings] = useState([]);
@@ -140,7 +142,7 @@ export default function StudentDashboard({ user, userName }) {
           />
         </div>
         <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-        <p className="text-base text-blue-100 mb-8">
+        <p className="text-sm text-blue-100 mb-8">
           {userName || user?.displayName || user?.name || 'Student'}
         </p>
 
@@ -239,7 +241,7 @@ export default function StudentDashboard({ user, userName }) {
                   <p className="text-3xl font-bold">
                     {bookings.filter((booking) => {
                       const status = (booking.status || '').toLowerCase();
-                      if (['cancelled', 'rejected'].includes(status)) return false;
+                      if (TERMINAL_BOOKING_STATUSES.has(status)) return false;
                       const start = toDate(booking.startTime)
                         || (booking.date && booking.start
                           ? new Date(`${booking.date}T${booking.start}:00`)
@@ -305,7 +307,7 @@ export default function StudentDashboard({ user, userName }) {
                         ? [booking.seat]
                         : [];
                     const status = String(booking.status || 'pending').toLowerCase();
-                    const canCancel = !['cancelled', 'rejected', 'attended'].includes(status);
+                    const canCancel = !TERMINAL_BOOKING_STATUSES.has(status);
                     const canConfirm = canConfirmAttendance(booking);
 
                     return (

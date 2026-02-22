@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { seatsAPI } from '../utils/api';
 
+const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'approved']);
+const isActiveBookingStatus = (status) => ACTIVE_BOOKING_STATUSES.has(String(status || '').toLowerCase());
+
 export default function BookingForm({ onBookingCreated }) {
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -18,24 +21,14 @@ export default function BookingForm({ onBookingCreated }) {
     try {
       const myBookingsResponse = await seatsAPI.getMySeats();
       const myBookings = Array.isArray(myBookingsResponse?.data?.data) ? myBookingsResponse.data.data : [];
-      const activeBookingsCount = myBookings.filter((booking) => {
-        const status = String(booking?.status || '').toLowerCase();
-        return status !== 'cancelled' && status !== 'rejected';
-      }).length;
-
-      if (activeBookingsCount >= 3) {
-        setError('Booking limit reached. You can only have up to 3 active bookings.');
-        return;
-      }
 
       const dailyBookingsCount = myBookings.filter((booking) => {
-        const status = String(booking?.status || '').toLowerCase();
-        if (status === 'cancelled' || status === 'rejected') return false;
+        if (!isActiveBookingStatus(booking?.status)) return false;
         return booking?.date === date;
       }).length;
 
-      if (dailyBookingsCount >= 1) {
-        setError('Booking limit reached. You can only create one booking per day.');
+      if (dailyBookingsCount >= 2) {
+        setError('Booking limit reached. You can only create up to 2 bookings per day.');
         return;
       }
 
