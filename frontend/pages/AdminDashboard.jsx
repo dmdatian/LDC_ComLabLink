@@ -2275,7 +2275,7 @@ export default function AdminDashboard({ user, userName }) {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100">
                       <tr>
-                        {['Name', 'Role', 'Grade Level', 'Section', 'Start Time', 'End Time', 'Seat', 'Subject', 'Purpose'].map((h) => (
+                        {['Name', 'Role', 'Grade Level', 'Section', 'Start Time', 'End Time', 'Seat', 'Subject', 'Purpose', 'Status'].map((h) => (
                           <th key={h} className="px-3 py-2 text-left whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -2301,6 +2301,7 @@ export default function AdminDashboard({ user, userName }) {
                             <td className="px-3 py-2 whitespace-nowrap">{seats.length > 0 ? seats.join(', ') : '-'}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{b.subject || '-'}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{b.purpose || '-'}</td>
+                            <td className="px-3 py-2 whitespace-nowrap capitalize">{String(b.status || '-')}</td>
                           </tr>
                         );
                       })}

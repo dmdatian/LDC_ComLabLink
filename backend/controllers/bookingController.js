@@ -21,6 +21,16 @@ const ATTENDANCE_CONFIRMATION_WINDOW_MINUTES = 15;
 const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'approved']);
 
 const isActiveBookingStatus = (status) => ACTIVE_BOOKING_STATUSES.has(String(status || '').toLowerCase());
+const isWeekendDateKey = (dateKey) => {
+  const match = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const utcDate = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = utcDate.getUTCDay(); // 0 Sunday, 6 Saturday
+  return dayOfWeek === 0 || dayOfWeek === 6;
+};
 
 const normalizeSeats = (value) => {
   if (!value) return [];
@@ -258,6 +268,10 @@ exports.createBooking = async (req, res) => {
 
     if (!validation.valid) {
       return sendError(res, 400, 'Validation failed', validation.errors);
+    }
+
+    if (isWeekendDateKey(date)) {
+      return sendError(res, 400, 'Bookings are not allowed on Saturday or Sunday');
     }
 
     const existingUserBookings = await Booking.getByStudentId(req.user.uid);

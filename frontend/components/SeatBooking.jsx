@@ -87,6 +87,13 @@ const BOOKING_END_TIME_OPTIONS = [
 
 const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'approved']);
 const isActiveBookingStatus = (status) => ACTIVE_BOOKING_STATUSES.has(String(status || '').toLowerCase());
+const isWeekendDate = (dateKey) => {
+  const match = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const utcDate = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  const day = utcDate.getUTCDay();
+  return day === 0 || day === 6;
+};
 
 export default function SeatBooking({ userName, onBookingCreated, hideAcademicFields = false }) {
   // STATE: form + availability
@@ -347,6 +354,11 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
     const startDateTime = new Date(`${date}T${startTime}:00`);
     const endDateTime = new Date(`${date}T${endTime}:00`);
 
+    if (isWeekendDate(date)) {
+      setStatusMessage('Weekend booking is not allowed. Please select Monday to Friday.');
+      return;
+    }
+
     if (startDateTime < now) {
       setStatusMessage('Cannot book past date/time.');
       return;
@@ -465,7 +477,15 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
             type="date"
             value={date}
             min={new Date().toISOString().split('T')[0]}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => {
+              const nextDate = e.target.value;
+              setDate(nextDate);
+              if (isWeekendDate(nextDate)) {
+                setStatusMessage('Weekend booking is not allowed. Please select Monday to Friday.');
+              } else if (statusMessage.includes('Weekend booking is not allowed')) {
+                setStatusMessage('');
+              }
+            }}
           />
         </div>
 

@@ -3,6 +3,13 @@ import { seatsAPI } from '../utils/api';
 
 const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'approved']);
 const isActiveBookingStatus = (status) => ACTIVE_BOOKING_STATUSES.has(String(status || '').toLowerCase());
+const isWeekendDate = (dateKey) => {
+  const match = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const utcDate = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  const day = utcDate.getUTCDay();
+  return day === 0 || day === 6;
+};
 
 export default function BookingForm({ onBookingCreated }) {
   const [date, setDate] = useState('');
@@ -19,6 +26,11 @@ export default function BookingForm({ onBookingCreated }) {
     setSuccess('');
 
     try {
+      if (isWeekendDate(date)) {
+        setError('Weekend booking is not allowed. Please select Monday to Friday.');
+        return;
+      }
+
       const myBookingsResponse = await seatsAPI.getMySeats();
       const myBookings = Array.isArray(myBookingsResponse?.data?.data) ? myBookingsResponse.data.data : [];
 
@@ -73,14 +85,22 @@ export default function BookingForm({ onBookingCreated }) {
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700 font-bold mb-2">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              min={new Date().toISOString().split('T')[0]}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-            />
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => {
+                  const nextDate = e.target.value;
+                  setDate(nextDate);
+                  if (isWeekendDate(nextDate)) {
+                    setError('Weekend booking is not allowed. Please select Monday to Friday.');
+                  } else if (error.includes('Weekend booking is not allowed')) {
+                    setError('');
+                  }
+                }}
+                required
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              />
           </div>
 
           <div className="mb-4">
