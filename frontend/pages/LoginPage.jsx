@@ -190,7 +190,7 @@ export default function LoginPage() {
   };
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center overflow-auto p-4 md:p-6"
+      className="fixed inset-0 overflow-auto p-4 md:p-6"
       style={{
         backgroundImage: `url(${backgroundLdc})`,
         backgroundSize: 'cover',
@@ -198,8 +198,9 @@ export default function LoginPage() {
         backgroundRepeat: 'no-repeat',
       }}
     >
-      <div className="grid w-full max-w-6xl rounded-2xl border border-slate-200 bg-white shadow-xl lg:grid-cols-[1.2fr_0.9fr]">
-        <section className="border-b border-slate-200 p-6 md:p-8 lg:border-b-0 lg:border-r">
+      <div className="mx-auto flex min-h-full w-full items-center justify-center">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl lg:grid lg:max-w-6xl lg:grid-cols-[1.2fr_0.9fr]">
+          <section className="hidden border-b border-slate-200 p-6 md:p-8 lg:block lg:border-b-0 lg:border-r">
           <div className="mb-10">
             <img
               src={logoName}
@@ -232,8 +233,8 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <section className="flex items-center p-6 md:p-8">
-          <div className="mx-auto w-full max-w-md">
+          <section className="flex w-full items-center justify-center p-6 md:p-8">
+            <div className="mx-auto w-full max-w-md">
             <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">
               {isLogin ? 'Account Login' : 'Create Account'}
             </h2>
@@ -341,7 +342,8 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-        </section>
+          </section>
+        </div>
       </div>
     </div>
   );
