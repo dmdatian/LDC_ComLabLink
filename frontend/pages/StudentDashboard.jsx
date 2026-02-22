@@ -7,7 +7,7 @@ import { logoutUser } from '../utils/auth';
 import logoName from '../assets/logo_name.png';
 import backgroundLdc from '../assets/background_ldc.jpg';
 
-const TERMINAL_BOOKING_STATUSES = new Set(['cancelled', 'rejected', 'attended', 'absent', 'missed']);
+const TERMINAL_BOOKING_STATUSES = new Set(['cancelled', 'rejected', 'attended', 'missed']);
 
 export default function StudentDashboard({ user, userName }) {
   // STATE: bookings + UI

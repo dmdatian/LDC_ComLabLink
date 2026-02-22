@@ -771,19 +771,19 @@ exports.markAttendance = async (req, res) => {
     const rawStatus = String(req.body.status || '').trim().toLowerCase();
     const nextStatus = rawStatus === 'present'
       ? 'attended'
-      : rawStatus === 'absent'
-        ? 'absent'
+      : (rawStatus === 'missed' || rawStatus === 'absent')
+        ? 'missed'
         : '';
 
     if (!nextStatus) {
-      return sendError(res, 400, 'Status must be present or absent');
+      return sendError(res, 400, 'Status must be present or missed');
     }
 
     const patch = { status: nextStatus };
     if (nextStatus === 'attended') {
       patch.attendanceConfirmedAt = new Date();
     }
-    if (nextStatus === 'absent') {
+    if (nextStatus === 'missed') {
       patch.attendanceNoShowAt = new Date();
       if (!booking.attendanceNoShowNotifiedAt) {
         patch.attendanceNoShowNotifiedAt = new Date();
@@ -793,10 +793,10 @@ exports.markAttendance = async (req, res) => {
     await Booking.update(req.params.id, patch);
 
     await createAttendanceNotification(booking, {
-      title: nextStatus === 'attended' ? 'Attendance Confirmed' : 'Attendance Marked Absent',
+      title: nextStatus === 'attended' ? 'Attendance Confirmed' : 'Attendance Marked Missed',
       message: nextStatus === 'attended'
         ? 'Your attendance was confirmed by admin.'
-        : 'Your attendance was marked absent by admin.',
+        : 'Your attendance was marked missed by admin.',
       severity: nextStatus === 'attended' ? 'info' : 'warning',
       type: 'attendance',
     });
@@ -819,7 +819,7 @@ exports.confirmAttendance = async (req, res) => {
     if (!isOwner && !isAdmin) return sendError(res, 403, 'Unauthorized');
 
     const status = String(booking.status || '').toLowerCase();
-    if (['cancelled', 'rejected', 'absent', 'missed'].includes(status)) {
+    if (['cancelled', 'rejected', 'missed', 'absent'].includes(status)) {
       return sendError(res, 409, `Cannot confirm attendance for status: ${status}`);
     }
     if (status === 'attended') {
@@ -858,7 +858,7 @@ exports.confirmAttendance = async (req, res) => {
           type: 'attendance',
         });
       }
-      return sendError(res, 409, 'Confirmation window expired. Booking marked absent.');
+      return sendError(res, 409, 'Confirmation window expired. Booking marked missed.');
     }
 
     await Booking.update(booking.id, {

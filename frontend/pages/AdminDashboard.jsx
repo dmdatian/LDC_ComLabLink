@@ -171,7 +171,7 @@ export default function AdminDashboard({ user, userName }) {
       const response = await attendanceAPI.getByDate(date);
       const rows = Array.isArray(response.data.data) ? response.data.data : [];
       setAttendanceRows(
-        rows.filter((row) => String(row?.status || '').toLowerCase() !== 'cancelled')
+        rows.filter((row) => String(row?.status || '').trim().toLowerCase() !== 'cancelled')
       );
     } catch (err) {
       setAttendanceError(err.response?.data?.message || 'Failed to load attendance');
@@ -2246,10 +2246,10 @@ export default function AdminDashboard({ user, userName }) {
                             Present
                           </button>
                           <button
-                            onClick={() => handleMarkAttendance(bookingId, 'absent')}
+                            onClick={() => handleMarkAttendance(bookingId, 'missed')}
                             className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition"
                           >
-                            Absent
+                            Missed
                           </button>
                         </div>
                       </div>

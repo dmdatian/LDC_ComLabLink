@@ -28,7 +28,7 @@ const FIXED_SCHEDULE_DAYS = [
   { dayOfWeek: 5, label: 'Friday' },
 ];
 
-const TERMINAL_BOOKING_STATUSES = new Set(['cancelled', 'rejected', 'attended', 'absent', 'missed']);
+const TERMINAL_BOOKING_STATUSES = new Set(['cancelled', 'rejected', 'attended', 'missed']);
 
 export default function TeacherDashboard({ user, userName }) {
   const toLocalDateKey = (dateObj = new Date()) => {

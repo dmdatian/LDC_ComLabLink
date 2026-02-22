@@ -271,8 +271,9 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       }
 
       const fixedScheduleConflict = fixedScheduleBlocks.find((block) => {
-        const blockStart = toTimeFloat(block.startDateTime || `${date}T${block.startTime}:00`);
-        const blockEnd = toTimeFloat(block.endDateTime || `${date}T${block.endTime}:00`);
+        // Prefer stored HH:mm values to avoid timezone shifts from Date serialization.
+        const blockStart = parseTime(block.startTime) ?? toTimeFloat(block.startDateTime || `${date}T${block.startTime}:00`);
+        const blockEnd = parseTime(block.endTime) ?? toTimeFloat(block.endDateTime || `${date}T${block.endTime}:00`);
         if (blockStart == null || blockEnd == null) return false;
         return selectedRange.start < blockEnd && selectedRange.end > blockStart;
       });
