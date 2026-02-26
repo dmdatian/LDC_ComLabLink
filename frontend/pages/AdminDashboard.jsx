@@ -1339,6 +1339,28 @@ export default function AdminDashboard({ user, userName }) {
     return { date: entry.date, value: rate };
   });
 
+  const extractBookingHour = (booking) => {
+    const raw = booking?.startTime || booking?.start || booking?.time;
+
+    if (typeof raw === 'string') {
+      const direct = raw.match(/^(\d{2}):(\d{2})(?::\d{2})?$/);
+      if (direct) {
+        const hour = Number(direct[1]);
+        return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : null;
+      }
+
+      const iso = raw.match(/T(\d{2}):(\d{2})/);
+      if (iso) {
+        const hour = Number(iso[1]);
+        return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : null;
+      }
+    }
+
+    const parsed = toDateObject(raw, booking?.date);
+    if (!parsed) return null;
+    return parsed.getUTCHours();
+  };
+
   const hourlyBookingSeries = (() => {
     const counts = Array.from({ length: 24 }, () => 0);
     detailBookings.forEach(({ bookings }) => {
@@ -1369,28 +1391,6 @@ export default function AdminDashboard({ user, userName }) {
     const suffix = h >= 12 ? 'PM' : 'AM';
     const hour12 = ((h + 11) % 12) + 1;
     return `${hour12}:00 ${suffix}`;
-  };
-
-  const extractBookingHour = (booking) => {
-    const raw = booking?.startTime || booking?.start || booking?.time;
-
-    if (typeof raw === 'string') {
-      const direct = raw.match(/^(\d{2}):(\d{2})(?::\d{2})?$/);
-      if (direct) {
-        const hour = Number(direct[1]);
-        return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : null;
-      }
-
-      const iso = raw.match(/T(\d{2}):(\d{2})/);
-      if (iso) {
-        const hour = Number(iso[1]);
-        return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : null;
-      }
-    }
-
-    const parsed = toDateObject(raw, booking?.date);
-    if (!parsed) return null;
-    return parsed.getUTCHours();
   };
 
   const predictedPeakHours = (() => {
