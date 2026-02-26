@@ -315,30 +315,25 @@ export default function TeacherDashboard({ user, userName }) {
                     const canConfirm = canConfirmAttendance(booking);
 
                     return (
-                      <div key={booking.id} className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <div
+                        key={booking.id}
+                        className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                      >
                         <div>
                           <p className="font-semibold">
                             {booking.date || '-'}{' '}
-                            {startDateTime
-                              ? startDateTime.toLocaleTimeString('en-PH', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  hour12: true,
-                                  timeZone: 'Asia/Manila'
-                                })
-                              : '-'}
+                            {startLabel || '-'}
                             {' - '}
-                            {endDateTime
-                              ? endDateTime.toLocaleTimeString('en-PH', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  hour12: true,
-                                  timeZone: 'Asia/Manila'
-                                })
-                              : '-'}
+                            {endLabel || '-'}
                           </p>
-                          <p className="text-sm text-gray-600">Seat: {seats.length > 0 ? seats.join(', ') : '-'}</p>
-                          <p className="text-xs text-gray-500 capitalize">Status: {status}</p>
+
+                          <p className="text-sm text-gray-600">
+                            Seat: {seats.length > 0 ? seats.join(', ') : '-'}
+                          </p>
+
+                          <p className="text-xs text-gray-500 capitalize">
+                            Status: {status}
+                          </p>
                         </div>
 
                         <div className="flex gap-2">
