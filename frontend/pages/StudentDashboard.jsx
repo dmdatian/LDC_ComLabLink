@@ -315,23 +315,9 @@ export default function StudentDashboard({ user, userName }) {
                         <div>
                           <p className="font-semibold">
                             {booking.date || '-'}{' '}
-                            {startDateTime
-                              ? startDateTime.toLocaleTimeString('en-PH', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  hour12: true,
-                                  timeZone: 'Asia/Manila'
-                                })
-                              : '-'}
+                            {startDateTime ? startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                             {' - '}
-                            {endDateTime
-                              ? endDateTime.toLocaleTimeString('en-PH', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  hour12: true,
-                                  timeZone: 'Asia/Manila'
-                                })
-                              : '-'}
+                            {endDateTime ? endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                           </p>
                           <p className="text-sm text-gray-600">Seat: {seats.length > 0 ? seats.join(', ') : '-'}</p>
                           <p className="text-xs text-gray-500 capitalize">Status: {status}</p>

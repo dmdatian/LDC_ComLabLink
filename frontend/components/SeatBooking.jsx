@@ -111,7 +111,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [purpose, setPurpose] = useState('');
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(''); // Added missing state
   const [subjectsList, setSubjectsList] = useState([]);
   const [gradeLevels, setGradeLevels] = useState([]);
   const [sections, setSections] = useState([]);
