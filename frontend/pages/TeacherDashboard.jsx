@@ -319,9 +319,23 @@ export default function TeacherDashboard({ user, userName }) {
                         <div>
                           <p className="font-semibold">
                             {booking.date || '-'}{' '}
-                            {start ? start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            {startDateTime
+                              ? startDateTime.toLocaleTimeString('en-PH', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: true,
+                                  timeZone: 'Asia/Manila'
+                                })
+                              : '-'}
                             {' - '}
-                            {end ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            {endDateTime
+                              ? endDateTime.toLocaleTimeString('en-PH', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: true,
+                                  timeZone: 'Asia/Manila'
+                                })
+                              : '-'}
                           </p>
                           <p className="text-sm text-gray-600">Seat: {seats.length > 0 ? seats.join(', ') : '-'}</p>
                           <p className="text-xs text-gray-500 capitalize">Status: {status}</p>
