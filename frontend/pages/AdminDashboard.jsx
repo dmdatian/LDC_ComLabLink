@@ -1337,13 +1337,9 @@ export default function AdminDashboard({ user, userName }) {
         const status = (booking.status || '').toLowerCase();
         if (status === 'cancelled' || status === 'rejected') return;
 
-        const start = toDateObject(
-          booking.startTime || booking.start || booking.time,
-          booking.date
-        );
-        if (!start) return;
-
-        counts[start.getHours()] += 1;
+        const hour = extractBookingHour(booking);
+        if (hour == null) return;
+        counts[hour] += 1;
       });
     });
     return counts.map((value, hour) => ({ hour, value }));
@@ -1366,6 +1362,28 @@ export default function AdminDashboard({ user, userName }) {
     return `${hour12}:00 ${suffix}`;
   };
 
+  const extractBookingHour = (booking) => {
+    const raw = booking?.startTime || booking?.start || booking?.time;
+
+    if (typeof raw === 'string') {
+      const direct = raw.match(/^(\d{2}):(\d{2})(?::\d{2})?$/);
+      if (direct) {
+        const hour = Number(direct[1]);
+        return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : null;
+      }
+
+      const iso = raw.match(/T(\d{2}):(\d{2})/);
+      if (iso) {
+        const hour = Number(iso[1]);
+        return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : null;
+      }
+    }
+
+    const parsed = toDateObject(raw, booking?.date);
+    if (!parsed) return null;
+    return parsed.getUTCHours();
+  };
+
   const predictedPeakHours = (() => {
     const dayCount = detailBookings.length;
     if (dayCount === 0) return [];
@@ -1377,13 +1395,8 @@ export default function AdminDashboard({ user, userName }) {
         const status = (booking.status || '').toLowerCase();
         if (status === 'cancelled' || status === 'rejected') return;
 
-        const start = toDateObject(
-          booking.startTime || booking.start || booking.time,
-          booking.date
-        );
-        if (!start) return;
-
-        const hour = start.getHours();
+        const hour = extractBookingHour(booking);
+        if (hour == null) return;
         if (hour >= 0 && hour <= 23) {
           hourlyByDay[hour][dayIdx] += 1;
         }
@@ -1416,7 +1429,10 @@ export default function AdminDashboard({ user, userName }) {
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
 
-    return top.length > 0 ? top : forecast.slice(0, 6);
+    if (top.length > 0) return top;
+    return peakHours
+      .filter((item) => item.value > 0)
+      .slice(0, 6);
   })();
 
   const topStudents = (() => {
@@ -1987,7 +2003,7 @@ export default function AdminDashboard({ user, userName }) {
               </div>
             ))}
           </div>
-          <h4 className="text-sm font-semibold text-gray-700 mt-5 mb-2">ML Predicted Peak Hours (Next Day)</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mt-5 mb-2">Predicted Peak Hours (Next Day)</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
             {predictedPeakHours.map((item) => (
               <div key={`pred-peak-${item.hour}`} className="bg-emerald-50 border border-emerald-100 rounded px-3 py-2">
