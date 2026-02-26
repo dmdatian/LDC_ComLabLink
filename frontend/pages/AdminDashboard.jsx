@@ -1339,7 +1339,7 @@ export default function AdminDashboard({ user, userName }) {
     return { date: entry.date, value: rate };
   });
 
-  const extractBookingHour = (booking) => {
+  function extractBookingHour(booking) {
     const raw = booking?.startTime || booking?.start || booking?.time;
 
     if (typeof raw === 'string') {
@@ -1359,7 +1359,7 @@ export default function AdminDashboard({ user, userName }) {
     const parsed = toDateObject(raw, booking?.date);
     if (!parsed) return null;
     return parsed.getUTCHours();
-  };
+  }
 
   const hourlyBookingSeries = (() => {
     const counts = Array.from({ length: 24 }, () => 0);
