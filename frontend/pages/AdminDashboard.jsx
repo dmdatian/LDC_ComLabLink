@@ -2012,7 +2012,7 @@ export default function AdminDashboard({ user, userName }) {
               </div>
             ))}
           </div>
-          <h4 className="text-sm font-semibold text-gray-700 mt-5 mb-2">Predicted Peak Hours (Next Day)</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mt-5 mb-2">Predicted Peak Hours</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
             {predictedPeakHours.map((item) => (
               <div key={`pred-peak-${item.hour}`} className="bg-emerald-50 border border-emerald-100 rounded px-3 py-2">
