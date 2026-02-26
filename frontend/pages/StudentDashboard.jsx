@@ -211,7 +211,7 @@ export default function StudentDashboard({ user, userName }) {
             onClick={() => setMobileMenuOpen((prev) => !prev)}
             className="bg-blue-700 text-white px-4 py-2 rounded-lg"
           >
-            {mobileMenuOpen ? 'Close Menu' : 'Open Menu'}
+            {mobileMenuOpen ? 'Close' : 'Menu'}
           </button>
         </div>
         {/* HOME SECTION */}
