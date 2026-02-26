@@ -125,6 +125,7 @@ export default function AdminDashboard({ user, userName }) {
   const [attendanceRows, setAttendanceRows] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceError, setAttendanceError] = useState('');
+  const [attendanceUpdatingId, setAttendanceUpdatingId] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -182,11 +183,19 @@ export default function AdminDashboard({ user, userName }) {
 
   const handleMarkAttendance = async (bookingId, status) => {
     try {
+      const targetId = String(bookingId);
+      const nextStatus = status === 'present' ? 'attended' : 'missed';
+      setAttendanceUpdatingId(targetId);
+      setAttendanceRows((rows) =>
+        rows.map((row) => (String(row.bookingId || row.id) === targetId ? { ...row, status: nextStatus } : row))
+      );
       await attendanceAPI.mark(bookingId, status);
       await fetchAttendance(selectedDate);
       await fetchDailyData();
     } catch (err) {
       setAttendanceError(err.response?.data?.message || 'Failed to mark attendance');
+    } finally {
+      setAttendanceUpdatingId('');
     }
   };
 
@@ -2237,6 +2246,9 @@ export default function AdminDashboard({ user, userName }) {
                 <div className="space-y-3">
                   {attendanceRows.map((row) => {
                     const bookingId = row.bookingId || row.id;
+                    const normalizedStatus = String(row.status || '').trim().toLowerCase();
+                    const isTerminalStatus = normalizedStatus === 'attended' || normalizedStatus === 'missed';
+                    const isUpdating = attendanceUpdatingId && String(attendanceUpdatingId) === String(bookingId);
                     const startLabel = formatClockTime(row.startTime, row.date);
                     const endLabel = formatClockTime(row.endTime, row.date);
                     return (
@@ -2254,20 +2266,34 @@ export default function AdminDashboard({ user, userName }) {
                           <p className="text-xs text-gray-500 capitalize">Status: {row.status || 'expected'}</p>
                         </div>
 
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleMarkAttendance(bookingId, 'present')}
-                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition"
+                        {isTerminalStatus ? (
+                          <span
+                            className={`px-3 py-1 rounded text-sm font-semibold ${
+                              normalizedStatus === 'attended'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}
                           >
-                            Present
-                          </button>
-                          <button
-                            onClick={() => handleMarkAttendance(bookingId, 'missed')}
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition"
-                          >
-                            Missed
-                          </button>
-                        </div>
+                            {normalizedStatus === 'attended' ? 'Attended' : 'Missed'}
+                          </span>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleMarkAttendance(bookingId, 'present')}
+                              disabled={isUpdating}
+                              className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-3 py-1 rounded transition"
+                            >
+                              Present
+                            </button>
+                            <button
+                              onClick={() => handleMarkAttendance(bookingId, 'missed')}
+                              disabled={isUpdating}
+                              className="bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white px-3 py-1 rounded transition"
+                            >
+                              Missed
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
