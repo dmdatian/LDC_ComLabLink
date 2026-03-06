@@ -7,8 +7,6 @@ class Feedback {
       const timestamp = new Date();
       const payload = {
         role: data.role,
-        name: data.name,
-        userId: data.userId,
         message: data.message,
         category: data.category || null,
         source: data.source || null,

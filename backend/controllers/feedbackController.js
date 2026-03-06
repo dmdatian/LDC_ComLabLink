@@ -1,5 +1,4 @@
 const Feedback = require('../models/Feedback');
-const User = require('../models/User');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
 exports.createFeedback = async (req, res) => {
@@ -10,14 +9,10 @@ exports.createFeedback = async (req, res) => {
       return sendError(res, 400, 'Feedback message is required');
     }
 
-    const user = await User.getById(req.user.uid);
-    const role = (user?.role || req.user.role || 'user').toLowerCase();
-    const name = user?.name || req.user.email?.split('@')[0] || 'User';
+    const role = (req.user.role || 'user').toLowerCase();
 
     const result = await Feedback.create({
       role,
-      name,
-      userId: req.user.uid,
       message: message.trim(),
       category,
       source,
@@ -35,10 +30,14 @@ exports.getFeedback = async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const entries = await Feedback.list({ limit });
 
-    const normalized = entries.map((entry) => ({
-      ...entry,
-      createdAt: entry.createdAt?.toISOString ? entry.createdAt.toISOString() : entry.createdAt,
-    }));
+    const normalized = entries.map((entry) => {
+      const { name, userId, ...safeEntry } = entry;
+      return {
+        ...safeEntry,
+        name: 'Anonymous',
+        createdAt: entry.createdAt?.toISOString ? entry.createdAt.toISOString() : entry.createdAt,
+      };
+    });
 
     sendSuccess(res, 200, normalized, 'Feedback retrieved');
   } catch (error) {

@@ -1615,7 +1615,7 @@ export default function AdminDashboard({ user, userName }) {
               {detailFeedback.map((entry) => (
                 <div key={entry.id} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="font-semibold">{entry.name || 'Anonymous'}</p>
+                    <p className="font-semibold">Anonymous</p>
                     <p className="text-xs text-gray-500">{formatFeedbackDate(entry.createdAt)}</p>
                   </div>
                   <p className="text-sm text-gray-600 mb-1 capitalize">{entry.role || 'user'}</p>
