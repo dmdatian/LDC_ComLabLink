@@ -156,8 +156,8 @@ const DEFAULT_SEAT_CATALOG = [
 ];
 
 const ensureSeatCatalogInitialized = async () => {
-  const settingsRef = db.collection('system_settings').doc('seat_catalog');
-  const catalogRef = db.collection('seat_catalog');
+  const settingsRef = db.collection('system_settings').doc('workspace_layout');
+  const catalogRef = db.collection('workspace_layout');
 
   const [settingsSnap, catalogSnap] = await Promise.all([
     settingsRef.get(),
@@ -494,7 +494,7 @@ exports.upsertSeatCatalogItem = async (req, res) => {
 
     const seatId = `${row}${column}`;
 
-    await db.collection('seat_catalog').doc(seatId).set({
+    await db.collection('workspace_layout').doc(seatId).set({
       row,
       column,
       side,
@@ -515,7 +515,7 @@ exports.deleteSeatCatalogItem = async (req, res) => {
     const seatId = String(req.params.id || '').trim().toUpperCase();
     if (!seatId) return sendError(res, 400, 'Seat ID is required');
 
-    await db.collection('seat_catalog').doc(seatId).delete();
+    await db.collection('workspace_layout').doc(seatId).delete();
     sendSuccess(res, 200, { id: seatId }, 'Seat deleted');
   } catch (error) {
     console.error('Delete seat error:', error);
@@ -914,7 +914,7 @@ exports.getAllBookings = async (req, res) => {
       bookings = await Booking.getByDate(date);
       await applyAttendanceAutomation(bookings);
     } else {
-      const snapshot = await require('../config/database').db.collection('seats').get();
+      const snapshot = await require('../config/database').db.collection('workspace').get();
       bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       await applyAttendanceAutomation(bookings);
     }

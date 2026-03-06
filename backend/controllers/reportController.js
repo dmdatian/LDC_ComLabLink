@@ -43,7 +43,7 @@ exports.getWeeklyReport = async (req, res) => {
     if (!startDate || !endDate) return sendError(res, 400, 'Start and end dates are required');
 
     // Use Booking.getByDate multiple times or a Firestore range query
-    const snapshot = await require('../config/database').db.collection('seats')
+    const snapshot = await require('../config/database').db.collection('workspace')
       .where('date', '>=', startDate)
       .where('date', '<=', endDate)
       .get();
@@ -76,7 +76,7 @@ exports.getMonthlyReport = async (req, res) => {
     const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
     const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-    const snapshot = await require('../config/database').db.collection('seats')
+    const snapshot = await require('../config/database').db.collection('workspace')
       .where('date', '>=', startDate)
       .where('date', '<=', endDate)
       .get();

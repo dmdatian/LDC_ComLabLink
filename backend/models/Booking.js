@@ -1,7 +1,7 @@
 const { db } = require('../config/database');
 const { isTimeConflict } = require('../utils/timeHelper');
 
-const COLLECTION = 'seats';
+const COLLECTION = 'workspace';
 
 // BOOKING MODEL: Firestore access for seats collection
 class Booking {
