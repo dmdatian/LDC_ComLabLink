@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loginUser, logoutUser, resetUserPassword } from '../utils/auth';
+import { loginUser, logoutUser } from '../utils/auth';
 import { authAPI } from '../utils/api';
 import logoName from '../assets/logo_name.png';
 import backgroundLdc from '../assets/background_ldc.jpg';
@@ -9,16 +9,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setSuccess('');
 
     try {
       const result = await loginUser(email, password);
@@ -92,37 +89,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleForgotPassword = async () => {
-    setError('');
-    setSuccess('');
-
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      setError('Please enter your email first.');
-      return;
-    }
-
-    setResetLoading(true);
-    try {
-      const result = await resetUserPassword(trimmedEmail);
-      if (result.success) {
-        setSuccess('Password reset email sent. Check your inbox.');
-        return;
-      }
-
-      const msg = (result.error || '').toLowerCase();
-      if (msg.includes('auth/invalid-email')) {
-        setError('Invalid email address.');
-      } else if (msg.includes('auth/user-not-found')) {
-        setError('Email not found.');
-      } else {
-        setError('Could not send reset email. Please try again.');
-      }
-    } finally {
-      setResetLoading(false);
-    }
-  };
-
   return (
     <div
       className="fixed inset-0 overflow-auto p-4 md:p-6"
@@ -177,12 +143,6 @@ export default function LoginPage() {
                   {error}
                 </div>
               )}
-              {success && (
-                <div className="mb-4 rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700">
-                  {success}
-                </div>
-              )}
-
               <form onSubmit={handleLogin}>
                 <div className="mb-4">
                   <label className="block text-gray-700 font-bold mb-2">Email</label>
@@ -207,16 +167,6 @@ export default function LoginPage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                     placeholder="********"
                   />
-                  <div className="mt-2 text-right">
-                    <button
-                      type="button"
-                      onClick={handleForgotPassword}
-                      disabled={loading || resetLoading}
-                      className="text-sm text-blue-500 hover:text-blue-700 disabled:opacity-50"
-                    >
-                      {resetLoading ? 'Sending reset email...' : 'Forgot password?'}
-                    </button>
-                  </div>
                 </div>
 
                 <button

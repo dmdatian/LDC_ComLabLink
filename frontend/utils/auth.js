@@ -5,7 +5,6 @@ import {
   signOut,
   setPersistence,
   browserLocalPersistence,
-  sendPasswordResetEmail,
 } from 'firebase/auth';
 
 export const registerUser = async (email, password) => {
@@ -44,13 +43,4 @@ export const logoutUser = async () => {
 
 export const getCurrentUser = () => {
   return auth.currentUser;
-};
-
-export const resetUserPassword = async (email) => {
-  try {
-    await sendPasswordResetEmail(auth, email);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
 };
