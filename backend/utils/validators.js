@@ -62,7 +62,7 @@ const validateBookingData = async (data) => {
 
   // Firestore check: lab capacity (avoid composite indexes)
   if (data.date && data.startTime && data.endTime) {
-    const bookingsSnap = await db.collection('workspace')
+    const bookingsSnap = await db.collection('workspace_booking')
       .where('date', '==', data.date)
       .get();
 
