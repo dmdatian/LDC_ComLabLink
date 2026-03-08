@@ -60,7 +60,12 @@ export default function AdminDashboard({ user, userName }) {
   const [deletedAccountUsers, setDeletedAccountUsers] = useState([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [accountsError, setAccountsError] = useState('');
+  const [accountsMessage, setAccountsMessage] = useState('');
   const [accountTab, setAccountTab] = useState('active');
+  const [accountSearch, setAccountSearch] = useState('');
+  const [accountGradeFilter, setAccountGradeFilter] = useState('');
+  const [accountSectionFilter, setAccountSectionFilter] = useState('');
+  const [importingCsv, setImportingCsv] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [reportTab, setReportTab] = useState('weekly');
   const [weeklyRange, setWeeklyRange] = useState({
@@ -717,6 +722,20 @@ export default function AdminDashboard({ user, userName }) {
     [teachers]
   );
 
+  const filteredAccountUsers = useMemo(() => {
+    const q = String(accountSearch || '').trim().toLowerCase();
+    return (accountUsers || []).filter((acct) => {
+      const name = String(acct?.name || '').toLowerCase();
+      const email = String(acct?.email || '').toLowerCase();
+      const grade = String(acct?.gradeLevel || '').toLowerCase();
+      const section = String(acct?.section || '').toLowerCase();
+      if (q && !name.includes(q) && !email.includes(q)) return false;
+      if (accountGradeFilter && String(acct?.gradeLevel || '') !== accountGradeFilter) return false;
+      if (accountSectionFilter && String(acct?.section || '') !== accountSectionFilter) return false;
+      return true;
+    });
+  }, [accountUsers, accountSearch, accountGradeFilter, accountSectionFilter]);
+
   const seatIdExists = (row, column) => {
     const id = `${String(row).toUpperCase()}${Number(column)}`;
     return seatCatalogAdmin.some((seat) => String(seat.id || '').toUpperCase() === id);
@@ -880,12 +899,120 @@ export default function AdminDashboard({ user, userName }) {
   const handleDeleteAccount = async (uid, label) => {
     if (!window.confirm(`Delete account for ${label}? This removes login access.`)) return;
     setAccountsError('');
+    setAccountsMessage('');
     try {
       await authAPI.deleteUserByUid(uid);
       await fetchAccountsData();
       await fetchSectionData();
+      setAccountsMessage('Account deleted.');
     } catch (err) {
       setAccountsError(err.response?.data?.message || 'Failed to delete account');
+    }
+  };
+
+  const parseCsvLine = (line = '') => {
+    const out = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let idx = 0; idx < line.length; idx += 1) {
+      const ch = line[idx];
+      const next = line[idx + 1];
+      if (ch === '"' && inQuotes && next === '"') {
+        current += '"';
+        idx += 1;
+        continue;
+      }
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (ch === ',' && !inQuotes) {
+        out.push(current.trim());
+        current = '';
+        continue;
+      }
+      current += ch;
+    }
+    out.push(current.trim());
+    return out;
+  };
+
+  const parseCsvPreview = (csvText) => {
+    const lines = String(csvText || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length < 2) return [];
+
+    const headers = parseCsvLine(lines[0]).map((h) => String(h || '').toLowerCase());
+    const rows = [];
+    for (let idx = 1; idx < lines.length; idx += 1) {
+      const cols = parseCsvLine(lines[idx]);
+      const row = {};
+      headers.forEach((header, colIdx) => {
+        row[header] = cols[colIdx] || '';
+      });
+      rows.push(row);
+    }
+    return rows;
+  };
+
+  const handleImportStudentsCsv = async (file) => {
+    if (!file) return;
+    setAccountsError('');
+    setAccountsMessage('');
+    setImportingCsv(true);
+    try {
+      const csvText = await file.text();
+      const previewRows = parseCsvPreview(csvText);
+      if (previewRows.length === 0) {
+        setAccountsError('CSV has no data rows.');
+        return;
+      }
+
+      const defaultPassword = window.prompt('Default password for imported accounts:', 'Student123') || 'Student123';
+      const response = await authAPI.importUsersFromCsv(csvText, defaultPassword);
+      const stats = response?.data?.data || {};
+      const errorCount = Array.isArray(stats.errors) ? stats.errors.length : 0;
+      setAccountsMessage(`CSV import done. Created: ${stats.created || 0}, Updated: ${stats.updated || 0}, Skipped: ${stats.skipped || 0}, Errors: ${errorCount}.`);
+      if (errorCount > 0) {
+        setAccountsError((stats.errors || []).slice(0, 5).join(' | '));
+      }
+      await fetchAccountsData();
+      await fetchSectionData();
+    } catch (err) {
+      setAccountsError(err.response?.data?.message || 'Failed to import CSV');
+    } finally {
+      setImportingCsv(false);
+    }
+  };
+
+  const handleResetAccountPassword = async (uid, label) => {
+    const nextPassword = window.prompt(`Set new password for ${label}:`, 'Student123');
+    if (!nextPassword) return;
+    setAccountsError('');
+    setAccountsMessage('');
+    try {
+      await authAPI.resetUserPasswordByUid(uid, nextPassword);
+      setAccountsMessage(`Password reset for ${label}.`);
+    } catch (err) {
+      setAccountsError(err.response?.data?.message || 'Failed to reset password');
+    }
+  };
+
+  const handleUpdateAccountPlacement = async (uid, gradeLevel, section) => {
+    setAccountsError('');
+    setAccountsMessage('');
+    try {
+      const response = await authAPI.updateUserByUid(uid, { gradeLevel, section });
+      const updated = response?.data?.data;
+      setAccountUsers((prev) => prev.map((acct) => (acct.uid === uid ? { ...acct, ...updated } : acct)));
+      setAccountsMessage('Account updated.');
+    } catch (err) {
+      setAccountsError(err.response?.data?.message || 'Failed to update account');
     }
   };
 
@@ -2494,7 +2621,7 @@ export default function AdminDashboard({ user, userName }) {
           </>
         )}
 
-        {/* ACCOUNTS */}
+                {/* ACCOUNTS */}
         {activeSection === 'accounts' && (
           <>
             <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -2523,37 +2650,145 @@ export default function AdminDashboard({ user, userName }) {
                   {accountsError}
                 </div>
               )}
+              {accountsMessage && (
+                <div className="mb-4 bg-green-100 border border-green-300 text-green-700 px-4 py-2 rounded">
+                  {accountsMessage}
+                </div>
+              )}
 
               {accountsLoading ? (
                 <p className="text-gray-500">Loading accounts...</p>
               ) : accountTab === 'active' ? (
-                accountUsers.length === 0 ? (
-                  <p className="text-gray-500">No active accounts found.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {accountUsers.map((acct) => (
-                      <div
-                        key={acct.uid}
-                        className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
-                      >
-                        <div>
-                          <p className="font-semibold">{acct.name || acct.email || acct.uid}</p>
-                          <p className="text-sm text-gray-600">{acct.email || '-'}</p>
-                          <p className="text-xs text-gray-500 capitalize">
-                            {acct.role || 'user'} • {acct.status || 'approved'}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAccount(acct.uid, acct.name || acct.email || acct.uid)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded transition"
-                        >
-                          Delete Account
-                        </button>
-                      </div>
-                    ))}
+                <>
+                  <div className="border border-dashed border-gray-300 rounded-lg p-4 mb-4 bg-gray-50">
+                    <p className="text-sm font-semibold text-gray-700 mb-2">Import Students CSV</p>
+                    <p className="text-xs text-gray-600 mb-3">
+                      Required columns: email, name. Optional: role, idNumber, gradeLevel, section.
+                    </p>
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      disabled={importingCsv}
+                      onChange={(e) => handleImportStudentsCsv(e.target.files?.[0])}
+                      className="block w-full text-sm text-gray-700"
+                    />
+                    {importingCsv && (
+                      <p className="text-xs text-blue-600 mt-2">Importing CSV...</p>
+                    )}
                   </div>
-                )
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    <input
+                      value={accountSearch}
+                      onChange={(e) => setAccountSearch(e.target.value)}
+                      placeholder="Search by name or email"
+                      className="border rounded-lg px-3 py-2"
+                    />
+                    <select
+                      value={accountGradeFilter}
+                      onChange={(e) => {
+                        setAccountGradeFilter(e.target.value);
+                        setAccountSectionFilter('');
+                      }}
+                      className="border rounded-lg px-3 py-2"
+                    >
+                      <option value="">All grade levels</option>
+                      {gradeLevels.map((grade) => (
+                        <option key={grade.id} value={grade.name || grade.id}>
+                          {grade.name || grade.id}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={accountSectionFilter}
+                      onChange={(e) => setAccountSectionFilter(e.target.value)}
+                      className="border rounded-lg px-3 py-2"
+                    >
+                      <option value="">All sections</option>
+                      {sections.map((section) => (
+                        <option key={section.id} value={section.name || section.id}>
+                          {section.name || section.id}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {filteredAccountUsers.length === 0 ? (
+                    <p className="text-gray-500">No active accounts found.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredAccountUsers.map((acct) => (
+                        <div
+                          key={acct.uid}
+                          className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                        >
+                          <div>
+                            <p className="font-semibold">{acct.name || acct.email || acct.uid}</p>
+                            <p className="text-sm text-gray-600">{acct.email || '-'}</p>
+                            <p className="text-xs text-gray-500 capitalize">
+                              {acct.role || 'user'} � {acct.status || 'approved'}
+                            </p>
+                            {String(acct.role || '').toLowerCase() === 'student' && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <select
+                                  value={acct.gradeLevel || ''}
+                                  onChange={(e) => setAccountUsers((prev) => prev.map((u) => (
+                                    u.uid === acct.uid ? { ...u, gradeLevel: e.target.value } : u
+                                  )))}
+                                  className="border rounded px-2 py-1 text-sm"
+                                >
+                                  <option value="">Grade</option>
+                                  {gradeLevels.map((grade) => (
+                                    <option key={grade.id} value={grade.name || grade.id}>
+                                      {grade.name || grade.id}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={acct.section || ''}
+                                  onChange={(e) => setAccountUsers((prev) => prev.map((u) => (
+                                    u.uid === acct.uid ? { ...u, section: e.target.value } : u
+                                  )))}
+                                  className="border rounded px-2 py-1 text-sm"
+                                >
+                                  <option value="">Section</option>
+                                  {sections.map((section) => (
+                                    <option key={section.id} value={section.name || section.id}>
+                                      {section.name || section.id}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateAccountPlacement(acct.uid, acct.gradeLevel || null, acct.section || null)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded text-sm"
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleResetAccountPassword(acct.uid, acct.name || acct.email || acct.uid)}
+                              className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded transition"
+                            >
+                              Reset Password
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAccount(acct.uid, acct.name || acct.email || acct.uid)}
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded transition"
+                            >
+                              Delete Account
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : (
                 deletedAccountUsers.length === 0 ? (
                   <p className="text-gray-500">No deleted accounts yet.</p>
@@ -2567,7 +2802,7 @@ export default function AdminDashboard({ user, userName }) {
                         <p className="font-semibold">{acct.name || acct.email || acct.uid}</p>
                         <p className="text-sm text-gray-600">{acct.email || '-'}</p>
                         <p className="text-xs text-gray-500 capitalize">
-                          {acct.role || 'user'} • Deleted: {formatFeedbackDate(acct.deletedAt)}
+                          {acct.role || 'user'} � Deleted: {formatFeedbackDate(acct.deletedAt)}
                         </p>
                       </div>
                     ))}

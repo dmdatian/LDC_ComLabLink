@@ -19,6 +19,9 @@ router.put('/approve/:email', authMiddleware, roleMiddleware(['admin']), authCon
 router.delete('/reject/:email', authMiddleware, roleMiddleware(['admin']), authController.rejectUser);
 router.get('/users', authMiddleware, roleMiddleware(['admin']), authController.getAllUsers);
 router.get('/users/deleted', authMiddleware, roleMiddleware(['admin']), authController.getDeletedUsers);
+router.post('/users/import-csv', authMiddleware, roleMiddleware(['admin']), authController.importUsersFromCsv);
+router.patch('/users/:uid', authMiddleware, roleMiddleware(['admin']), authController.updateUserAccount);
+router.put('/users/:uid/reset-password', authMiddleware, roleMiddleware(['admin']), authController.resetUserPassword);
 router.delete('/users/:uid', authMiddleware, roleMiddleware(['admin']), authController.deleteUserAccount);
 
 // Example admin-only route

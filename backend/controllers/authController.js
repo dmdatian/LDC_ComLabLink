@@ -397,3 +397,211 @@ exports.updateProfile = async (req, res) => {
     sendError(res, 500, 'Failed to update profile', error.message);
   }
 };
+
+const parseCsvLine = (line = '') => {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let idx = 0; idx < line.length; idx += 1) {
+    const ch = line[idx];
+    const next = line[idx + 1];
+
+    if (ch === '"' && inQuotes && next === '"') {
+      current += '"';
+      idx += 1;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (ch === ',' && !inQuotes) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+
+  values.push(current.trim());
+  return values;
+};
+
+const parseCsvRows = (csvText = '') => {
+  const lines = String(csvText)
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) return [];
+
+  const headers = parseCsvLine(lines[0]).map((h) => String(h || '').trim().toLowerCase());
+  const rows = [];
+
+  for (let idx = 1; idx < lines.length; idx += 1) {
+    const raw = parseCsvLine(lines[idx]);
+    const row = {};
+    headers.forEach((header, colIdx) => {
+      row[header] = raw[colIdx] == null ? '' : String(raw[colIdx]).trim();
+    });
+    rows.push(row);
+  }
+
+  return rows;
+};
+
+exports.importUsersFromCsv = async (req, res) => {
+  try {
+    const { csvText, defaultPassword } = req.body || {};
+    const password = String(defaultPassword || 'Student123').trim();
+    if (password.length < 6) {
+      return sendError(res, 400, 'Default password must be at least 6 characters');
+    }
+
+    if (!csvText || !String(csvText).trim()) {
+      return sendError(res, 400, 'CSV content is required');
+    }
+
+    const rows = parseCsvRows(csvText);
+    if (rows.length === 0) {
+      return sendError(res, 400, 'No CSV rows found');
+    }
+
+    const summary = {
+      total: rows.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+    };
+
+    for (let idx = 0; idx < rows.length; idx += 1) {
+      const rowNumber = idx + 2;
+      const row = rows[idx];
+      const email = String(row.email || row['email address'] || '').trim().toLowerCase();
+      const name = String(row.name || row.fullname || row['full name'] || '').trim();
+      const role = String(row.role || 'student').trim().toLowerCase();
+      const idNumber = String(row.idnumber || row['id number'] || row.id || '').trim() || null;
+      const gradeLevel = String(row.gradelevel || row.grade || row['grade level'] || '').trim() || null;
+      const section = String(row.section || '').trim() || null;
+
+      if (!email || !name) {
+        summary.skipped += 1;
+        summary.errors.push(`Row ${rowNumber}: email and name are required`);
+        continue;
+      }
+      if (!validateEmail(email)) {
+        summary.skipped += 1;
+        summary.errors.push(`Row ${rowNumber}: invalid email "${email}"`);
+        continue;
+      }
+      if (!['student', 'teacher'].includes(role)) {
+        summary.skipped += 1;
+        summary.errors.push(`Row ${rowNumber}: role must be student or teacher`);
+        continue;
+      }
+
+      try {
+        let authUser = null;
+        try {
+          authUser = await auth.getUserByEmail(email);
+        } catch (authErr) {
+          const code = String(authErr?.code || '');
+          if (!code.includes('user-not-found')) throw authErr;
+        }
+
+        if (!authUser) {
+          authUser = await auth.createUser({
+            email,
+            password,
+            displayName: name,
+          });
+        } else {
+          await auth.updateUser(authUser.uid, { displayName: name });
+        }
+
+        const existing = await User.getById(authUser.uid);
+        const payload = {
+          email,
+          name,
+          role,
+          idNumber,
+          gradeLevel: role === 'student' ? gradeLevel : null,
+          section: role === 'student' ? section : null,
+          status: 'approved',
+        };
+
+        if (existing) {
+          await User.update(authUser.uid, payload);
+          summary.updated += 1;
+        } else {
+          await User.create(authUser.uid, payload);
+          summary.created += 1;
+        }
+      } catch (rowErr) {
+        summary.skipped += 1;
+        summary.errors.push(`Row ${rowNumber}: ${rowErr.message || 'failed to import'}`);
+      }
+    }
+
+    return sendSuccess(res, 200, summary, 'CSV import completed');
+  } catch (error) {
+    console.error('Import users from CSV error:', error);
+    return sendError(res, 500, 'Failed to import CSV users', error.message);
+  }
+};
+
+exports.updateUserAccount = async (req, res) => {
+  try {
+    const uid = String(req.params.uid || '').trim();
+    if (!uid) return sendError(res, 400, 'UID is required');
+
+    const existing = await User.getById(uid);
+    if (!existing) return sendError(res, 404, 'User not found');
+
+    const name = String(req.body?.name ?? existing.name ?? '').trim();
+    const gradeLevelRaw = req.body?.gradeLevel;
+    const sectionRaw = req.body?.section;
+    const gradeLevel = gradeLevelRaw == null ? existing.gradeLevel || null : String(gradeLevelRaw).trim() || null;
+    const section = sectionRaw == null ? existing.section || null : String(sectionRaw).trim() || null;
+
+    const patch = {
+      name: name || existing.name || null,
+      gradeLevel: String(existing.role || '').toLowerCase() === 'student' ? gradeLevel : null,
+      section: String(existing.role || '').toLowerCase() === 'student' ? section : null,
+    };
+
+    await User.update(uid, patch);
+    try {
+      await auth.updateUser(uid, { displayName: patch.name || undefined });
+    } catch (authErr) {
+      // Keep Firestore update as source of truth even if Auth profile update fails.
+    }
+
+    const updated = await User.getById(uid);
+    return sendSuccess(res, 200, updated, 'User account updated');
+  } catch (error) {
+    console.error('Update user account error:', error);
+    return sendError(res, 500, 'Failed to update user account', error.message);
+  }
+};
+
+exports.resetUserPassword = async (req, res) => {
+  try {
+    const uid = String(req.params.uid || '').trim();
+    const newPassword = String(req.body?.newPassword || 'Student123').trim();
+    if (!uid) return sendError(res, 400, 'UID is required');
+    if (newPassword.length < 6) {
+      return sendError(res, 400, 'New password must be at least 6 characters');
+    }
+
+    await auth.updateUser(uid, { password: newPassword });
+    return sendSuccess(res, 200, { uid }, 'Password reset successful');
+  } catch (error) {
+    console.error('Reset user password error:', error);
+    return sendError(res, 500, 'Failed to reset user password', error.message);
+  }
+};

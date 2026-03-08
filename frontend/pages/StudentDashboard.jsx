@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { seatsAPI, feedbackAPI, notificationAPI } from '../utils/api';
 // BOOKING COMPONENT: add/replace your booking UI file here
 import SeatBooking from '../components/SeatBooking';
-import { logoutUser } from '../utils/auth';
+import { changeUserPassword, logoutUser } from '../utils/auth';
 import logoName from '../assets/logo_name.png';
 import backgroundLdc from '../assets/background_ldc.jpg';
 
@@ -20,6 +20,10 @@ export default function StudentDashboard({ user, userName }) {
   const [pendingCancelId, setPendingCancelId] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
   const navigate = useNavigate();
 
   const toDate = (value) => {
@@ -106,6 +110,38 @@ export default function StudentDashboard({ user, userName }) {
     navigate('/login');
   };
 
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordMessage('');
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordMessage('Please fill all password fields.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordMessage('New password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage('New password and confirm password do not match.');
+      return;
+    }
+
+    const result = await changeUserPassword(currentPassword, newPassword);
+    if (result.success) {
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordMessage('Password updated successfully.');
+    } else {
+      const msg = String(result.error || '').toLowerCase();
+      if (msg.includes('wrong-password') || msg.includes('invalid-credential')) {
+        setPasswordMessage('Current password is incorrect.');
+      } else {
+        setPasswordMessage('Failed to change password. Please try again.');
+      }
+    }
+  };
+
   // FEEDBACK: submit
   const handleFeedbackSubmit = (e) => {
     e.preventDefault();
@@ -181,6 +217,17 @@ export default function StudentDashboard({ user, userName }) {
             }`}
           >
             Feedback
+          </button>
+          <button
+            onClick={() => {
+              setActiveSection('account');
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full text-left px-4 py-2 rounded transition ${
+              activeSection === 'account' ? 'bg-blue-600' : 'hover:bg-blue-600'
+            }`}
+          >
+            Account
           </button>
         </nav>
 
@@ -414,6 +461,47 @@ export default function StudentDashboard({ user, userName }) {
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
                 >
                   Submit Feedback
+                </button>
+              </form>
+            </div>
+          </section>
+        )}
+
+        {activeSection === 'account' && (
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold mb-4">Account</h2>
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-lg font-semibold mb-3">Change Password</h3>
+              <form onSubmit={handleChangePassword} className="space-y-3">
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Current password"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="New password"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+                {passwordMessage && (
+                  <p className="text-sm text-blue-600">{passwordMessage}</p>
+                )}
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+                >
+                  Update Password
                 </button>
               </form>
             </div>

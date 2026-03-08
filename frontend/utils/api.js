@@ -34,6 +34,12 @@ export const authAPI = {
   rejectUser: (email) => api.delete(`/auth/reject/${encodeURIComponent(email)}`),
   getAllUsers: () => api.get('/auth/users'),
   getDeletedUsers: () => api.get('/auth/users/deleted'),
+  importUsersFromCsv: (csvText, defaultPassword) =>
+    api.post('/auth/users/import-csv', { csvText, defaultPassword }),
+  updateUserByUid: (uid, data) =>
+    api.patch(`/auth/users/${encodeURIComponent(uid)}`, data),
+  resetUserPasswordByUid: (uid, newPassword) =>
+    api.put(`/auth/users/${encodeURIComponent(uid)}/reset-password`, { newPassword }),
   deleteUserByUid: (uid) => api.delete(`/auth/users/${encodeURIComponent(uid)}`),
 };
 
