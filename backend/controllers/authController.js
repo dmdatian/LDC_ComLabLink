@@ -481,16 +481,29 @@ exports.importUsersFromCsv = async (req, res) => {
     for (let idx = 0; idx < rows.length; idx += 1) {
       const rowNumber = idx + 2;
       const row = rows[idx];
-      const email = String(row.email || row['email address'] || '').trim().toLowerCase();
-      const name = String(row.name || row.fullname || row['full name'] || '').trim();
+      const pick = (...keys) => {
+        for (const key of keys) {
+          const value = row[key];
+          if (value != null && String(value).trim()) return String(value).trim();
+        }
+        return '';
+      };
+
+      const email = pick('email', 'email address').toLowerCase();
+      const surname = pick('surname', 'last name', 'lastname');
+      const firstName = pick('first name', 'firstname');
+      const middleName = pick('middle name', 'middlename', 'middle initial');
+      const explicitName = pick('name', 'fullname', 'full name');
+      const assembledName = [surname, firstName, middleName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+      const name = explicitName || assembledName;
       const role = String(row.role || 'student').trim().toLowerCase();
-      const idNumber = String(row.idnumber || row['id number'] || row.id || '').trim() || null;
-      const gradeLevel = String(row.gradelevel || row.grade || row['grade level'] || '').trim() || null;
-      const section = String(row.section || '').trim() || null;
+      const idNumber = pick('idnumber', 'id number', 'id') || null;
+      const gradeLevel = pick('gradelevel', 'grade level', 'grade') || null;
+      const section = pick('section') || null;
 
       if (!email || !name) {
         summary.skipped += 1;
-        summary.errors.push(`Row ${rowNumber}: email and name are required`);
+        summary.errors.push(`Row ${rowNumber}: email and name fields are required`);
         continue;
       }
       if (!validateEmail(email)) {

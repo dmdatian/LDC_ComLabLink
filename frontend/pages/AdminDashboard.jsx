@@ -1757,10 +1757,10 @@ export default function AdminDashboard({ user, userName }) {
   );
 
   const formatFeedbackDate = (value) => {
-    if (!value) return '—';
+    if (!value) return 'â€”';
     const date = toDateObject(value);
-    if (!date) return '—';
-    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
+    if (!date) return 'â€”';
+    return Number.isNaN(date.getTime()) ? 'â€”' : date.toLocaleString();
   };
 
   const handleDownloadReport = () => {
@@ -2320,7 +2320,7 @@ export default function AdminDashboard({ user, userName }) {
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-2xl font-bold mb-4">Pending Approvals</h2>
 
-              {pendingLoading && <p className="text-gray-500">Loading…</p>}
+              {pendingLoading && <p className="text-gray-500">Loadingâ€¦</p>}
               {pendingError && <p className="text-red-600">{pendingError}</p>}
 
               {!pendingLoading && pendingUsers.length === 0 && (
@@ -2445,7 +2445,7 @@ export default function AdminDashboard({ user, userName }) {
 
             <div className="bg-white rounded-lg shadow-lg p-6">
               {loading ? (
-                <p className="text-gray-500">Loading…</p>
+                <p className="text-gray-500">Loadingâ€¦</p>
               ) : bookings.length === 0 ? (
                 <p className="text-gray-500">No bookings</p>
               ) : (
@@ -2663,7 +2663,7 @@ export default function AdminDashboard({ user, userName }) {
                   <div className="border border-dashed border-gray-300 rounded-lg p-4 mb-4 bg-gray-50">
                     <p className="text-sm font-semibold text-gray-700 mb-2">Import Students CSV</p>
                     <p className="text-xs text-gray-600 mb-3">
-                      Required columns: email, name. Optional: role, idNumber, gradeLevel, section.
+                      Supported columns: Surname, First Name, Middle Name, Email, Grade level, Section.
                     </p>
                     <input
                       type="file"
@@ -2726,7 +2726,7 @@ export default function AdminDashboard({ user, userName }) {
                             <p className="font-semibold">{acct.name || acct.email || acct.uid}</p>
                             <p className="text-sm text-gray-600">{acct.email || '-'}</p>
                             <p className="text-xs text-gray-500 capitalize">
-                              {acct.role || 'user'} � {acct.status || 'approved'}
+                              {acct.role || 'user'} • {acct.status || 'approved'}
                             </p>
                             {String(acct.role || '').toLowerCase() === 'student' && (
                               <div className="mt-2 flex flex-wrap gap-2">
@@ -2802,7 +2802,7 @@ export default function AdminDashboard({ user, userName }) {
                         <p className="font-semibold">{acct.name || acct.email || acct.uid}</p>
                         <p className="text-sm text-gray-600">{acct.email || '-'}</p>
                         <p className="text-xs text-gray-500 capitalize">
-                          {acct.role || 'user'} � Deleted: {formatFeedbackDate(acct.deletedAt)}
+                          {acct.role || 'user'} • Deleted: {formatFeedbackDate(acct.deletedAt)}
                         </p>
                       </div>
                     ))}
