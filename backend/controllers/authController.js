@@ -375,6 +375,10 @@ exports.updateProfile = async (req, res) => {
     if (name) updateData.name = name;
     if (phone) updateData.phone = phone;
     if (avatar) updateData.avatar = avatar;
+    if (req.body?.requiresPasswordChange === false) {
+      updateData.requiresPasswordChange = false;
+      updateData.passwordChangedAt = new Date();
+    }
 
     if (Object.keys(updateData).length === 0) {
       return sendError(res, 400, 'No fields provided to update');
@@ -455,10 +459,14 @@ const parseCsvRows = (csvText = '') => {
 
 exports.importUsersFromCsv = async (req, res) => {
   try {
-    const { csvText, defaultPassword } = req.body || {};
-    const password = String(defaultPassword || 'Student123').trim();
+    const { csvText, defaultPassword, forcedRole } = req.body || {};
+    const password = String(defaultPassword || 'ldc@2026!').trim();
+    const normalizedForcedRole = forcedRole == null ? '' : String(forcedRole).trim().toLowerCase();
     if (password.length < 6) {
       return sendError(res, 400, 'Default password must be at least 6 characters');
+    }
+    if (normalizedForcedRole && !['student', 'teacher'].includes(normalizedForcedRole)) {
+      return sendError(res, 400, 'Forced role must be student or teacher');
     }
 
     if (!csvText || !String(csvText).trim()) {
@@ -496,7 +504,8 @@ exports.importUsersFromCsv = async (req, res) => {
       const explicitName = pick('name', 'fullname', 'full name');
       const assembledName = [surname, firstName, middleName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
       const name = explicitName || assembledName;
-      const role = String(row.role || 'student').trim().toLowerCase();
+      const csvRole = String(row.role || '').trim().toLowerCase();
+      const role = normalizedForcedRole || csvRole || 'student';
       const idNumber = pick('idnumber', 'id number', 'id') || null;
       const gradeLevel = pick('gradelevel', 'grade level', 'grade') || null;
       const section = pick('section') || null;
@@ -533,7 +542,11 @@ exports.importUsersFromCsv = async (req, res) => {
             displayName: name,
           });
         } else {
-          await auth.updateUser(authUser.uid, { displayName: name });
+          // Treat CSV import as the source of truth for yearly rollovers.
+          await auth.updateUser(authUser.uid, {
+            displayName: name,
+            password,
+          });
         }
 
         const existing = await User.getById(authUser.uid);
@@ -545,6 +558,7 @@ exports.importUsersFromCsv = async (req, res) => {
           gradeLevel: role === 'student' ? gradeLevel : null,
           section: role === 'student' ? section : null,
           status: 'approved',
+          requiresPasswordChange: true,
         };
 
         if (existing) {
@@ -612,6 +626,10 @@ exports.resetUserPassword = async (req, res) => {
     }
 
     await auth.updateUser(uid, { password: newPassword });
+    await User.update(uid, {
+      requiresPasswordChange: true,
+      passwordChangedAt: null,
+    });
     return sendSuccess(res, 200, { uid }, 'Password reset successful');
   } catch (error) {
     console.error('Reset user password error:', error);

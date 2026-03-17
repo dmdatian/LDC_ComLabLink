@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { seatsAPI, feedbackAPI, notificationAPI } from '../utils/api';
+import { seatsAPI, feedbackAPI, notificationAPI, authAPI } from '../utils/api';
 import SeatBooking from '../components/SeatBooking';
 import { changeUserPassword, logoutUser } from '../utils/auth';
 import logoName from '../assets/logo_name.png';
@@ -45,6 +45,7 @@ export default function TeacherDashboard({ user, userName }) {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackStatus, setFeedbackStatus] = useState('');
   const [notifications, setNotifications] = useState([]);
+  const [requirePasswordChange, setRequirePasswordChange] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [pendingCancelId, setPendingCancelId] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -83,9 +84,31 @@ export default function TeacherDashboard({ user, userName }) {
 
   const fetchNotifications = async () => {
     try {
-      const response = await notificationAPI.getMine(20);
-      setNotifications(response.data.data || []);
+      const [notificationsResponse, profileResponse] = await Promise.all([
+        notificationAPI.getMine(20),
+        authAPI.getProfile(),
+      ]);
+      const profile = profileResponse?.data?.data || {};
+      const shouldRequirePasswordChange = profile?.requiresPasswordChange === true;
+      const rows = Array.isArray(notificationsResponse?.data?.data)
+        ? notificationsResponse.data.data
+        : [];
+
+      if (shouldRequirePasswordChange) {
+        rows.unshift({
+          id: 'password-change-required',
+          title: 'Change Your Password',
+          message: 'Your account is still using the default password. Please change it from the Account section.',
+          severity: 'warning',
+          type: 'account',
+          read: false,
+        });
+      }
+
+      setRequirePasswordChange(shouldRequirePasswordChange);
+      setNotifications(rows);
     } catch (err) {
+      setRequirePasswordChange(false);
       setNotifications([]);
     }
   };
@@ -113,10 +136,16 @@ export default function TeacherDashboard({ user, userName }) {
 
     const result = await changeUserPassword(currentPassword, newPassword);
     if (result.success) {
+      try {
+        await authAPI.updateProfile({ requiresPasswordChange: false });
+      } catch (profileErr) {
+        // Password has already changed in Firebase Auth. Refresh UI best-effort.
+      }
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setPasswordMessage('Password updated successfully.');
+      await fetchNotifications();
     } else {
       const msg = String(result.error || '').toLowerCase();
       if (msg.includes('wrong-password') || msg.includes('invalid-credential')) {
@@ -540,6 +569,11 @@ export default function TeacherDashboard({ user, userName }) {
             <h2 className="text-2xl font-bold mb-4">Account</h2>
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h3 className="text-lg font-semibold mb-3">Change Password</h3>
+              {requirePasswordChange && (
+                <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Please change your default password. This notice will disappear after a successful update.
+                </div>
+              )}
               <form onSubmit={handleChangePassword} className="space-y-3">
                 <input
                   type="password"

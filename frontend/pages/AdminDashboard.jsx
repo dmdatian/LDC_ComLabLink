@@ -63,8 +63,10 @@ export default function AdminDashboard({ user, userName }) {
   const [accountsMessage, setAccountsMessage] = useState('');
   const [accountTab, setAccountTab] = useState('active');
   const [accountSearch, setAccountSearch] = useState('');
+  const [accountRoleFilter, setAccountRoleFilter] = useState('');
   const [accountGradeFilter, setAccountGradeFilter] = useState('');
   const [accountSectionFilter, setAccountSectionFilter] = useState('');
+  const [csvImportRole, setCsvImportRole] = useState('student');
   const [importingCsv, setImportingCsv] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [reportTab, setReportTab] = useState('weekly');
@@ -727,14 +729,16 @@ export default function AdminDashboard({ user, userName }) {
     return (accountUsers || []).filter((acct) => {
       const name = String(acct?.name || '').toLowerCase();
       const email = String(acct?.email || '').toLowerCase();
+      const role = String(acct?.role || '').toLowerCase();
       const grade = String(acct?.gradeLevel || '').toLowerCase();
       const section = String(acct?.section || '').toLowerCase();
       if (q && !name.includes(q) && !email.includes(q)) return false;
+      if (accountRoleFilter && role !== accountRoleFilter) return false;
       if (accountGradeFilter && String(acct?.gradeLevel || '') !== accountGradeFilter) return false;
       if (accountSectionFilter && String(acct?.section || '') !== accountSectionFilter) return false;
       return true;
     });
-  }, [accountUsers, accountSearch, accountGradeFilter, accountSectionFilter]);
+  }, [accountUsers, accountSearch, accountRoleFilter, accountGradeFilter, accountSectionFilter]);
 
   const seatIdExists = (row, column) => {
     const id = `${String(row).toUpperCase()}${Number(column)}`;
@@ -973,8 +977,8 @@ export default function AdminDashboard({ user, userName }) {
         return;
       }
 
-      const defaultPassword = window.prompt('Default password for imported accounts:', 'Student123') || 'Student123';
-      const response = await authAPI.importUsersFromCsv(csvText, defaultPassword);
+      const defaultPassword = window.prompt('Default password for imported accounts:', 'ldc@2026!') || 'ldc@2026!';
+      const response = await authAPI.importUsersFromCsv(csvText, defaultPassword, csvImportRole);
       const stats = response?.data?.data || {};
       const errorCount = Array.isArray(stats.errors) ? stats.errors.length : 0;
       setAccountsMessage(`CSV import done. Created: ${stats.created || 0}, Updated: ${stats.updated || 0}, Skipped: ${stats.skipped || 0}, Errors: ${errorCount}.`);
@@ -2661,9 +2665,25 @@ export default function AdminDashboard({ user, userName }) {
               ) : accountTab === 'active' ? (
                 <>
                   <div className="border border-dashed border-gray-300 rounded-lg p-4 mb-4 bg-gray-50">
-                    <p className="text-sm font-semibold text-gray-700 mb-2">Import Students CSV</p>
+                    <p className="text-sm font-semibold text-gray-700 mb-2">Import Accounts CSV</p>
                     <p className="text-xs text-gray-600 mb-3">
                       Supported columns: Surname, First Name, Middle Name, Email, Grade level, Section.
+                    </p>
+                    <div className="mb-3">
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Import as</label>
+                      <select
+                        value={csvImportRole}
+                        onChange={(e) => setCsvImportRole(e.target.value)}
+                        className="border rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="student">Student accounts</option>
+                        <option value="teacher">Faculty accounts</option>
+                      </select>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">
+                      {csvImportRole === 'teacher'
+                        ? 'Faculty import uses the same CSV columns. Grade level and section will be ignored for teacher accounts.'
+                        : 'Student import uses Grade level and Section from the CSV.'}
                     </p>
                     <input
                       type="file"
@@ -2677,13 +2697,22 @@ export default function AdminDashboard({ user, userName }) {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
                     <input
                       value={accountSearch}
                       onChange={(e) => setAccountSearch(e.target.value)}
                       placeholder="Search by name or email"
                       className="border rounded-lg px-3 py-2"
                     />
+                    <select
+                      value={accountRoleFilter}
+                      onChange={(e) => setAccountRoleFilter(e.target.value)}
+                      className="border rounded-lg px-3 py-2"
+                    >
+                      <option value="">All account types</option>
+                      <option value="teacher">Teachers</option>
+                      <option value="student">Students</option>
+                    </select>
                     <select
                       value={accountGradeFilter}
                       onChange={(e) => {

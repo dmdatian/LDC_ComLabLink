@@ -15,6 +15,8 @@ class User {
         gradeLevel: userData.gradeLevel,
         section: userData.section,
         status: userData.status || 'approved', // 'approved' | 'pending'
+        requiresPasswordChange: userData.requiresPasswordChange === true,
+        passwordChangedAt: userData.passwordChangedAt || null,
         createdAt: timestamp,
         updatedAt: timestamp,
       });
