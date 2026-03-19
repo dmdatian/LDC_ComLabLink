@@ -21,6 +21,9 @@ const authMiddleware = async (req, res, next) => {
       const role = userDoc.data().role || null;
       req.user.role = role ? role.toLowerCase() : null;
       req.user.status = userDoc.data().status || null;
+      if (String(req.user.status || '').toLowerCase() === 'inactive') {
+        return res.status(403).json({ success: false, message: 'Account is inactive. Please contact admin.' });
+      }
     } else {
       req.user.role = null;
       req.user.status = null;

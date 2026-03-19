@@ -113,6 +113,11 @@ export default function TeacherDashboard({ user, userName }) {
     }
   };
 
+  const handleBookingCreated = async () => {
+    await fetchBookings();
+    await fetchNotifications();
+  };
+
   const handleLogout = async () => {
     await logoutUser();
     navigate('/login');
@@ -427,7 +432,7 @@ export default function TeacherDashboard({ user, userName }) {
             <h2 className="text-2xl font-bold mb-6">Booking</h2>
             <SeatBooking
               userName={userName || user?.displayName || user?.name || 'Teacher'}
-              onBookingCreated={fetchBookings}
+              onBookingCreated={handleBookingCreated}
               hideAcademicFields
             />
           </section>

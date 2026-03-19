@@ -57,7 +57,7 @@ export default function AdminDashboard({ user, userName }) {
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState('');
   const [accountUsers, setAccountUsers] = useState([]);
-  const [deletedAccountUsers, setDeletedAccountUsers] = useState([]);
+  const [inactiveAccountUsers, setInactiveAccountUsers] = useState([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [accountsError, setAccountsError] = useState('');
   const [accountsMessage, setAccountsMessage] = useState('');
@@ -224,19 +224,20 @@ export default function AdminDashboard({ user, userName }) {
     setAccountsLoading(true);
     setAccountsError('');
     try {
-      const [activeResponse, deletedResponse] = await Promise.all([
+      const [activeResponse, inactiveResponse] = await Promise.all([
         authAPI.getAllUsers(),
-        authAPI.getDeletedUsers(),
+        authAPI.getInactiveUsers(),
       ]);
 
       const activeUsers = (activeResponse.data?.data || [])
         .filter((item) => String(item.role || '').toLowerCase() !== 'admin')
+        .filter((item) => String(item.status || 'approved').toLowerCase() !== 'inactive')
         .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-      const removedUsers = (deletedResponse.data?.data || [])
-        .sort((a, b) => String(b.deletedAt || '').localeCompare(String(a.deletedAt || '')));
+      const removedUsers = (inactiveResponse.data?.data || [])
+        .sort((a, b) => String(b.inactiveAt || '').localeCompare(String(a.inactiveAt || '')));
 
       setAccountUsers(activeUsers);
-      setDeletedAccountUsers(removedUsers);
+      setInactiveAccountUsers(removedUsers);
     } catch (err) {
       setAccountsError(err.response?.data?.message || 'Failed to load accounts');
     } finally {
@@ -901,16 +902,30 @@ export default function AdminDashboard({ user, userName }) {
   };
 
   const handleDeleteAccount = async (uid, label) => {
-    if (!window.confirm(`Delete account for ${label}? This removes login access.`)) return;
+    if (!window.confirm(`Mark account for ${label} as inactive? This removes login access.`)) return;
     setAccountsError('');
     setAccountsMessage('');
     try {
       await authAPI.deleteUserByUid(uid);
       await fetchAccountsData();
       await fetchSectionData();
-      setAccountsMessage('Account deleted.');
+      setAccountsMessage('Account marked inactive.');
     } catch (err) {
-      setAccountsError(err.response?.data?.message || 'Failed to delete account');
+      setAccountsError(err.response?.data?.message || 'Failed to mark account inactive');
+    }
+  };
+
+  const handlePermanentDeleteAccount = async (uid, label) => {
+    if (!window.confirm(`Permanently delete inactive account for ${label}? This cannot be undone.`)) return;
+    setAccountsError('');
+    setAccountsMessage('');
+    try {
+      await authAPI.permanentlyDeleteUserByUid(uid);
+      await fetchAccountsData();
+      await fetchSectionData();
+      setAccountsMessage('Inactive account permanently deleted.');
+    } catch (err) {
+      setAccountsError(err.response?.data?.message || 'Failed to permanently delete account');
     }
   };
 
@@ -2641,10 +2656,10 @@ export default function AdminDashboard({ user, userName }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setAccountTab('deleted')}
-                    className={`px-3 py-2 rounded ${accountTab === 'deleted' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+                    onClick={() => setAccountTab('inactive')}
+                    className={`px-3 py-2 rounded ${accountTab === 'inactive' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
                   >
-                    Deleted Accounts
+                    Inactive Accounts
                   </button>
                 </div>
               </div>
@@ -2810,7 +2825,7 @@ export default function AdminDashboard({ user, userName }) {
                               onClick={() => handleDeleteAccount(acct.uid, acct.name || acct.email || acct.uid)}
                               className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded transition"
                             >
-                              Delete Account
+                              Mark Inactive
                             </button>
                           </div>
                         </div>
@@ -2819,20 +2834,29 @@ export default function AdminDashboard({ user, userName }) {
                   )}
                 </>
               ) : (
-                deletedAccountUsers.length === 0 ? (
-                  <p className="text-gray-500">No deleted accounts yet.</p>
+                inactiveAccountUsers.length === 0 ? (
+                  <p className="text-gray-500">No inactive accounts yet.</p>
                 ) : (
                   <div className="space-y-3">
-                    {deletedAccountUsers.map((acct) => (
+                    {inactiveAccountUsers.map((acct) => (
                       <div
                         key={acct.uid}
-                        className="border border-gray-200 rounded-lg p-4"
+                        className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
                       >
-                        <p className="font-semibold">{acct.name || acct.email || acct.uid}</p>
-                        <p className="text-sm text-gray-600">{acct.email || '-'}</p>
-                        <p className="text-xs text-gray-500 capitalize">
-                          {acct.role || 'user'} • Deleted: {formatFeedbackDate(acct.deletedAt)}
-                        </p>
+                        <div>
+                          <p className="font-semibold">{acct.name || acct.email || acct.uid}</p>
+                          <p className="text-sm text-gray-600">{acct.email || '-'}</p>
+                          <p className="text-xs text-gray-500 capitalize">
+                            {acct.role || 'user'} • Inactive: {formatFeedbackDate(acct.inactiveAt)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handlePermanentDeleteAccount(acct.uid, acct.name || acct.email || acct.uid)}
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition"
+                        >
+                          Delete Permanently
+                        </button>
                       </div>
                     ))}
                   </div>

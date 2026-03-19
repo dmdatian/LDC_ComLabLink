@@ -75,26 +75,12 @@ class User {
   }
 
   // Get deleted user records
-  static async getDeletedUsers() {
+  static async getInactiveUsers() {
     try {
-      const snapshot = await db.collection('deleted_users').get();
+      const snapshot = await db.collection('users')
+        .where('status', '==', 'inactive')
+        .get();
       return snapshot.docs.map((doc) => doc.data());
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  // Archive deleted user for admin visibility/history
-  static async archiveDeletedUser(uid, userData, meta = {}) {
-    try {
-      const timestamp = new Date();
-      await db.collection('deleted_users').doc(uid).set({
-        uid,
-        ...userData,
-        deletedAt: timestamp,
-        deletedBy: meta.deletedBy || null,
-      }, { merge: true });
-      return { success: true };
     } catch (error) {
       throw error;
     }

@@ -106,6 +106,11 @@ export default function StudentDashboard({ user, userName }) {
     }
   };
 
+  const handleBookingCreated = async () => {
+    await fetchBookings();
+    await fetchNotifications();
+  };
+
   // BOOKINGS API: cancel
   const handleCancelBooking = async (bookingId) => {
     try {
@@ -434,7 +439,7 @@ export default function StudentDashboard({ user, userName }) {
             <h2 className="text-2xl font-bold mb-6">Booking</h2>
             <SeatBooking
               userName={userName || user?.displayName || user?.name || 'Student'}
-              onBookingCreated={fetchBookings}
+              onBookingCreated={handleBookingCreated}
             />
           </section>
         )}

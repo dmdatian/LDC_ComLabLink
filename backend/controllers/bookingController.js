@@ -72,6 +72,16 @@ const createAttendanceNotification = async (booking, payload) => {
   });
 };
 
+const createBookingNotification = async (booking, payload) => {
+  const userId = String(booking?.studentId || '').trim();
+  if (!userId) return;
+  await Notification.create({
+    userId,
+    bookingId: booking.id,
+    ...payload,
+  });
+};
+
 const applyAttendanceAutomation = async (bookings = [], opts = {}) => {
   const now = new Date();
   const reminderUserId = String(opts.reminderUserId || '').trim();
@@ -422,6 +432,16 @@ exports.createBooking = async (req, res) => {
       targetId: bookingResult.id,
       targetType: 'booking',
       details: { date, startTime, endTime, seats: normalizedSeats },
+    });
+
+    await createBookingNotification({
+      id: bookingResult.id,
+      studentId: req.user.uid,
+    }, {
+      title: 'Booking Approved',
+      message: `Your booking for ${date} was saved successfully.`,
+      severity: 'info',
+      type: 'booking',
     });
 
     sendSuccess(res, 201, {
@@ -892,6 +912,13 @@ exports.cancelBooking = async (req, res) => {
     }
 
     await Booking.update(req.params.id, { status: 'cancelled' });
+
+    await createBookingNotification(booking, {
+      title: 'Booking Cancelled',
+      message: `Your booking for ${booking.date || 'the selected date'} was cancelled.`,
+      severity: 'warning',
+      type: 'booking',
+    });
 
     sendSuccess(res, 200, {}, 'Booking cancelled');
   } catch (error) {

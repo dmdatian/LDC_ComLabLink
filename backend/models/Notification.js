@@ -24,13 +24,30 @@ class Notification {
 
   static async listByUser(userId, limit = 50) {
     const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
-    const snapshot = await db.collection(COLLECTION)
-      .where('userId', '==', String(userId || '').trim())
-      .orderBy('createdAt', 'desc')
-      .limit(safeLimit)
-      .get();
+    const normalizedUserId = String(userId || '').trim();
+    try {
+      const snapshot = await db.collection(COLLECTION)
+        .where('userId', '==', normalizedUserId)
+        .orderBy('createdAt', 'desc')
+        .limit(safeLimit)
+        .get();
 
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    } catch (error) {
+      // Fallback for deployments where the ordered query is unavailable or not indexed yet.
+      const snapshot = await db.collection(COLLECTION)
+        .where('userId', '==', normalizedUserId)
+        .get();
+
+      return snapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() }))
+        .sort((a, b) => {
+          const aTime = a?.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a?.createdAt || 0).getTime();
+          const bTime = b?.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b?.createdAt || 0).getTime();
+          return bTime - aTime;
+        })
+        .slice(0, safeLimit);
+    }
   }
 
   static async markRead(id, userId) {

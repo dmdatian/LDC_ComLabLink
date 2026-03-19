@@ -177,12 +177,16 @@ exports.login = async (req, res) => {
 
     // Firestore-friendly: only return Firestore data
     const normalizedRole = (user.role || '').toLowerCase();
+    const status = user.status || 'approved';
+    if (status === 'inactive') {
+      return sendError(res, 403, 'Account is inactive. Please contact admin.');
+    }
     sendSuccess(res, 200, {
       uid: user.uid,
       email: user.email,
       name: user.name,
       role: normalizedRole,
-      status: user.status || 'approved',
+      status,
     }, 'User found. Please verify with your token.');
   } catch (error) {
     console.error('Login error:', error);
@@ -218,12 +222,16 @@ exports.verifyToken = async (req, res) => {
     }
 
     const normalizedRole = (user.role || '').toLowerCase();
+    const status = user.status || 'approved';
+    if (status === 'inactive') {
+      return sendError(res, 403, 'Account is inactive. Please contact admin.');
+    }
     sendSuccess(res, 200, {
       uid: req.user.uid,
       email: req.user.email,
       name: user.name,
       role: normalizedRole,
-      status: user.status || 'approved',
+      status,
     }, 'Token verified');
   } catch (error) {
     console.error('Token verification error:', error);
@@ -309,13 +317,13 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-exports.getDeletedUsers = async (req, res) => {
+exports.getInactiveUsers = async (req, res) => {
   try {
-    const users = await User.getDeletedUsers();
-    sendSuccess(res, 200, users, 'Deleted users retrieved');
+    const users = await User.getInactiveUsers();
+    sendSuccess(res, 200, users, 'Inactive users retrieved');
   } catch (error) {
-    console.error('Get deleted users error:', error);
-    sendError(res, 500, 'Failed to get deleted users', error.message);
+    console.error('Get inactive users error:', error);
+    sendError(res, 500, 'Failed to get inactive users', error.message);
   }
 };
 
@@ -331,13 +339,49 @@ exports.deleteUserAccount = async (req, res) => {
     const existing = await User.getById(uid);
     if (!existing) return sendError(res, 404, 'User not found');
 
-    await User.archiveDeletedUser(uid, existing, { deletedBy: req.user.uid });
+    try {
+      await auth.updateUser(uid, { disabled: true });
+    } catch (authErr) {
+      const code = authErr?.code || '';
+      // If auth record is already gone, continue updating Firestore user.
+      if (!code.includes('user-not-found')) {
+        throw authErr;
+      }
+    }
+
+    await User.update(uid, {
+      status: 'inactive',
+      inactiveAt: new Date(),
+      inactiveBy: req.user.uid,
+    });
+
+    sendSuccess(res, 200, { uid }, 'User account marked inactive');
+  } catch (error) {
+    console.error('Delete user account error:', error);
+    sendError(res, 500, 'Failed to delete user account', error.message);
+  }
+};
+
+exports.permanentlyDeleteUserAccount = async (req, res) => {
+  try {
+    const { uid } = req.params;
+    if (!uid) return sendError(res, 400, 'UID is required');
+
+    if (uid === req.user.uid) {
+      return sendError(res, 400, 'You cannot delete your own account');
+    }
+
+    const existing = await User.getById(uid);
+    if (!existing) return sendError(res, 404, 'User not found');
+
+    if (String(existing.status || '').toLowerCase() !== 'inactive') {
+      return sendError(res, 409, 'Only inactive accounts can be permanently deleted');
+    }
 
     try {
       await auth.deleteUser(uid);
     } catch (authErr) {
       const code = authErr?.code || '';
-      // If auth record is already gone, continue removing Firestore user.
       if (!code.includes('user-not-found')) {
         throw authErr;
       }
@@ -345,10 +389,10 @@ exports.deleteUserAccount = async (req, res) => {
 
     await User.delete(uid);
 
-    sendSuccess(res, 200, { uid }, 'User account deleted');
+    sendSuccess(res, 200, { uid }, 'User account permanently deleted');
   } catch (error) {
-    console.error('Delete user account error:', error);
-    sendError(res, 500, 'Failed to delete user account', error.message);
+    console.error('Permanent delete user account error:', error);
+    sendError(res, 500, 'Failed to permanently delete user account', error.message);
   }
 };
 

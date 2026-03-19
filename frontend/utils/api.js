@@ -33,7 +33,7 @@ export const authAPI = {
   approveUser: (email) => api.put(`/auth/approve/${encodeURIComponent(email)}`),
   rejectUser: (email) => api.delete(`/auth/reject/${encodeURIComponent(email)}`),
   getAllUsers: () => api.get('/auth/users'),
-  getDeletedUsers: () => api.get('/auth/users/deleted'),
+  getInactiveUsers: () => api.get('/auth/users/inactive'),
   importUsersFromCsv: (csvText, defaultPassword, forcedRole) =>
     api.post('/auth/users/import-csv', { csvText, defaultPassword, forcedRole }),
   updateUserByUid: (uid, data) =>
@@ -41,6 +41,7 @@ export const authAPI = {
   resetUserPasswordByUid: (uid, newPassword) =>
     api.put(`/auth/users/${encodeURIComponent(uid)}/reset-password`, { newPassword }),
   deleteUserByUid: (uid) => api.delete(`/auth/users/${encodeURIComponent(uid)}`),
+  permanentlyDeleteUserByUid: (uid) => api.delete(`/auth/users/${encodeURIComponent(uid)}/permanent`),
 };
 
 // SEATS (BOOKING) API

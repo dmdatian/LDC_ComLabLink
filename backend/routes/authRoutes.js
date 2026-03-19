@@ -18,11 +18,12 @@ router.get('/pending', authMiddleware, roleMiddleware(['admin']), authController
 router.put('/approve/:email', authMiddleware, roleMiddleware(['admin']), authController.approveUser);
 router.delete('/reject/:email', authMiddleware, roleMiddleware(['admin']), authController.rejectUser);
 router.get('/users', authMiddleware, roleMiddleware(['admin']), authController.getAllUsers);
-router.get('/users/deleted', authMiddleware, roleMiddleware(['admin']), authController.getDeletedUsers);
+router.get('/users/inactive', authMiddleware, roleMiddleware(['admin']), authController.getInactiveUsers);
 router.post('/users/import-csv', authMiddleware, roleMiddleware(['admin']), authController.importUsersFromCsv);
 router.patch('/users/:uid', authMiddleware, roleMiddleware(['admin']), authController.updateUserAccount);
 router.put('/users/:uid/reset-password', authMiddleware, roleMiddleware(['admin']), authController.resetUserPassword);
 router.delete('/users/:uid', authMiddleware, roleMiddleware(['admin']), authController.deleteUserAccount);
+router.delete('/users/:uid/permanent', authMiddleware, roleMiddleware(['admin']), authController.permanentlyDeleteUserAccount);
 
 // Example admin-only route
 // router.put('/admin-update/:uid', authMiddleware, roleMiddleware(['admin']), authController.updateProfile);
