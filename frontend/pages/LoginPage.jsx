@@ -21,14 +21,13 @@ export default function LoginPage() {
       const result = await loginUser(email, password);
       if (result.success) {
         try {
-          const verifyResponse = await authAPI.verify();
-          const status = verifyResponse?.data?.data?.status;
-          if (status === 'pending') {
-            alert('Please wait... Your account is pending approval.');
+          await authAPI.verify();
+        } catch (verifyErr) {
+          if (verifyErr?.response?.status === 403) {
+            alert(verifyErr?.response?.data?.message || 'Account is inactive. Please contact admin.');
             await logoutUser();
             return;
           }
-        } catch (verifyErr) {
           await logoutUser();
           throw verifyErr;
         }
@@ -38,6 +37,8 @@ export default function LoginPage() {
         const msg = (result.error || '').toLowerCase();
         if (msg.includes('auth/user-not-found')) {
           setError('Email not found.');
+        } else if (msg.includes('auth/user-disabled')) {
+          setError('Account is inactive. Please contact admin.');
         } else if (msg.includes('auth/wrong-password')) {
           setError('Incorrect password.');
         } else if (msg.includes('auth/invalid-email')) {
@@ -49,21 +50,6 @@ export default function LoginPage() {
     } catch (err) {
       const msg = (err?.message || '').toLowerCase();
       if (msg.includes('auth/user-not-found')) {
-        try {
-          const checkResponse = await authAPI.login(email);
-          const status = checkResponse?.data?.data?.status;
-          if (status === 'pending') {
-            alert('Please wait... Your account is pending approval.');
-            return;
-          }
-        } catch (checkErr) {
-          const code = checkErr?.response?.status;
-          if (code === 409) {
-            alert('Account exists but is not registered in the system. Please contact admin.');
-            return;
-          }
-        }
-
         setError('Email not found.');
         return;
       }
@@ -73,13 +59,20 @@ export default function LoginPage() {
         return;
       }
 
+      if (msg.includes('auth/user-disabled')) {
+        setError('Account is inactive. Please contact admin.');
+        return;
+      }
+
       if (msg.includes('auth/invalid-email')) {
         setError('Invalid email address.');
         return;
       }
 
       const code = err?.response?.status;
-      if (code === 409) {
+      if (code === 403) {
+        setError(err?.response?.data?.message || 'Account is inactive. Please contact admin.');
+      } else if (code === 409) {
         alert('Account exists but is not registered in the system. Please contact admin.');
       } else {
         setError('Login failed');
@@ -165,7 +158,7 @@ export default function LoginPage() {
                     required
                     minLength={1}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                    placeholder="********"
+                    placeholder="••••••••"
                   />
                 </div>
 
