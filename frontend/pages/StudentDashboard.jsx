@@ -38,6 +38,20 @@ export default function StudentDashboard({ user, userName }) {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   };
 
+  const formatStoredClock = (booking, key) => {
+    const raw = String(booking?.[key] || '').trim();
+    const match = raw.match(/^(\d{2}):(\d{2})$/);
+    if (match) {
+      const hours = Number(match[1]);
+      const minutes = Number(match[2]);
+      const suffix = hours >= 12 ? 'PM' : 'AM';
+      const hour12 = ((hours + 11) % 12) + 1;
+      return `${String(hour12).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${suffix}`;
+    }
+    const parsed = toDate(booking?.[key === 'startClock' ? 'startTime' : 'endTime']);
+    return parsed ? parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+  };
+
   const getAttendanceDeadline = (booking) => {
     const start = toDate(booking?.startTime);
     if (!start) return null;
@@ -402,9 +416,9 @@ export default function StudentDashboard({ user, userName }) {
                         <div>
                           <p className="font-semibold">
                             {booking.date || '-'}{' '}
-                            {startDateTime ? startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            {formatStoredClock(booking, 'startClock')}
                             {' - '}
-                            {endDateTime ? endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            {formatStoredClock(booking, 'endClock')}
                           </p>
                           <p className="text-sm text-gray-600">Seat: {seats.length > 0 ? seats.join(', ') : '-'}</p>
                           <p className="text-xs text-gray-500 capitalize">Status: {status}</p>

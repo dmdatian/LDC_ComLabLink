@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { seatsAPI } from '../utils/api';
+import { authAPI } from '../utils/api';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import './SeatBooking.css';
@@ -121,10 +122,29 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   const [sectionId, setSectionId] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [isFixedScheduleBlocked, setIsFixedScheduleBlocked] = useState(false);
+  const [profileLocked, setProfileLocked] = useState(false);
 
   // Set initial name
   useEffect(() => {
     setName(userName || '');
+  }, [userName]);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await authAPI.getProfile();
+        const profile = response?.data?.data || {};
+        setName(profile.name || userName || '');
+        setGradeLevelId(profile.gradeLevelId || '');
+        setSectionId(profile.sectionId || '');
+        setProfileLocked(true);
+      } catch (err) {
+        setName(userName || '');
+        setProfileLocked(false);
+      }
+    };
+
+    fetchProfile();
   }, [userName]);
 
   // Fetch subjects from backend via seatsAPI
@@ -336,14 +356,13 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   // Handle booking submission
   const handleBooking = async () => {
     setIsFixedScheduleBlocked(false);
-    const trimmedName = name.trim();
     const trimmedPurpose = purpose.trim();
     const trimmedSubject = subject.trim();
-    const selectedGrade = gradeLevels.find((item) => item.id === gradeLevelId);
-    const selectedSection = sections.find((item) => item.id === sectionId);
+    const selectedGrade = gradeLevels.find((item) => item.id === gradeLevelId) || null;
+    const selectedSection = sections.find((item) => item.id === sectionId) || null;
     const needsAcademicFields = !hideAcademicFields;
 
-    if (!trimmedName || !selectedSeat || !date || !startTime || !endTime || !trimmedPurpose || !trimmedSubject) {
+    if (!name.trim() || !selectedSeat || !date || !startTime || !endTime || !trimmedPurpose || !trimmedSubject) {
       setStatusMessage('Please fill all required fields and select a seat.');
       return;
     }
@@ -387,9 +406,10 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       }
 
       const createResponse = await seatsAPI.createSeatBooking({
-        name: trimmedName,
         seats: [selectedSeat],
         date,
+        startClock: startTime,
+        endClock: endTime,
         startTime: `${date}T${startTime}:00`,
         endTime: `${date}T${endTime}:00`,
         purpose: trimmedPurpose,
@@ -476,7 +496,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       <div className="form-grid">
         <div className="full-span">
           <label>Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <input value={name} readOnly className={profileLocked ? 'bg-gray-100 text-gray-700 cursor-not-allowed' : ''} />
         </div>
 
         <div>
@@ -512,6 +532,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
                   setGradeLevelId(e.target.value);
                   setSectionId('');
                 }}
+                disabled={profileLocked}
                 required
               >
                 <option value="">Select grade level</option>
@@ -528,7 +549,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
               <select
                 value={sectionId}
                 onChange={(e) => setSectionId(e.target.value)}
-                disabled={!gradeLevelId}
+                disabled={!gradeLevelId || profileLocked}
                 required
               >
                 <option value="">{gradeLevelId ? 'Select section' : 'Select grade level first'}</option>

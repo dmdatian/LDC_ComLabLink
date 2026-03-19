@@ -38,6 +38,17 @@ const normalizeSeats = (value) => {
   return [value];
 };
 
+const formatClockLabel = (value) => {
+  const normalized = normalizeTime(value);
+  if (!normalized) return '--:--';
+  const [hoursText, minutesText] = normalized.split(':');
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = ((hours + 11) % 12) + 1;
+  return `${hour12}:${String(minutes).padStart(2, '0')} ${suffix}`;
+};
+
 const toDate = (value) => {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -263,10 +274,16 @@ const hasBlockedSeatConflict = async (seatIds, date, startDateTime, endDateTime)
 // SEAT BOOKING: create
 exports.createBooking = async (req, res) => {
   try {
-    const { date, startTime, endTime, seats, purpose, subject, name, gradeLevelId, gradeLevel, sectionId, section } = req.body;
+    const { date, startTime, endTime, startClock, endClock, seats, purpose, subject } = req.body;
     const normalizedSeats = normalizeSeats(seats);
-    const startDateTime = new Date(startTime);
-    const endDateTime = new Date(endTime);
+    const normalizedStartClock = normalizeTime(startClock || String(startTime || '').slice(11, 16));
+    const normalizedEndClock = normalizeTime(endClock || String(endTime || '').slice(11, 16));
+    const startDateTime = combineDateAndTime(date, normalizedStartClock);
+    const endDateTime = combineDateAndTime(date, normalizedEndClock);
+
+    if (!date || !startDateTime || !endDateTime || !normalizedStartClock || !normalizedEndClock) {
+      return sendError(res, 400, 'Invalid booking date/time');
+    }
 
     const seatCatalog = await getSeatCatalog();
     const allowedSeatIds = new Set(seatCatalog.map((seat) => seat.id));
@@ -277,10 +294,10 @@ exports.createBooking = async (req, res) => {
 
     // Validate input
     const validation = await validateBookingData({ 
-      studentId: req.user.uid, 
-      date, 
-      startTime: startDateTime, 
-      endTime: endDateTime 
+      studentId: req.user.uid,
+      date,
+      startTime: startDateTime,
+      endTime: endDateTime
     });
 
     if (!validation.valid) {
@@ -327,8 +344,8 @@ exports.createBooking = async (req, res) => {
       isTimeConflict(
         new Date(cls.startTime),
         new Date(cls.endTime),
-        new Date(startTime),
-        new Date(endTime)
+        startDateTime,
+        endDateTime
       )
     );
 
@@ -416,18 +433,20 @@ exports.createBooking = async (req, res) => {
     // --- Create booking ---
     const bookingResult = await Booking.create({
       studentId: req.user.uid,
-      studentName: name || req.user.name || 'Unknown',
+      studentName: req.user.name || 'Unknown',
       role: req.user.role || 'student',
       date,
+      startClock: normalizedStartClock,
+      endClock: normalizedEndClock,
       startTime: startDateTime,
       endTime: endDateTime,
       seats: normalizedSeats,
       purpose,
       subject,
-      gradeLevelId: gradeLevelId || null,
-      gradeLevel: gradeLevel || null,
-      sectionId: sectionId || null,
-      section: section || null,
+      gradeLevelId: req.user.gradeLevelId || null,
+      gradeLevel: req.user.gradeLevel || null,
+      sectionId: req.user.sectionId || null,
+      section: req.user.section || null,
       status: 'approved',
       attendanceDeadlineAt,
     });
@@ -454,8 +473,10 @@ exports.createBooking = async (req, res) => {
     sendSuccess(res, 201, {
       id: bookingResult.id,
       date,
-      startTime,
-      endTime,
+      startTime: startDateTime,
+      endTime: endDateTime,
+      startClock: normalizedStartClock,
+      endClock: normalizedEndClock,
       seats: normalizedSeats,
       status: 'approved',
       attendanceDeadlineAt,
@@ -807,13 +828,41 @@ exports.markAttendance = async (req, res) => {
     }
 
     const patch = { status: nextStatus };
+    const start = toDate(booking.startTime);
+    const deadline = getAttendanceDeadline(booking);
+    const now = new Date();
+
     if (nextStatus === 'attended') {
+      if (!start || !deadline) {
+        return sendError(res, 400, 'Invalid booking time');
+      }
+      if (now < start) {
+        return sendError(res, 409, `Attendance confirmation starts at ${formatClockLabel(booking.startClock || formatClock(start).slice(0, 5))}.`);
+      }
+      if (now > deadline) {
+        const missedPatch = {
+          status: 'missed',
+          attendanceNoShowAt: now,
+        };
+        if (!booking.attendanceNoShowNotifiedAt) {
+          missedPatch.attendanceNoShowNotifiedAt = now;
+        }
+        await Booking.update(req.params.id, missedPatch);
+        await createAttendanceNotification(booking, {
+          title: 'Attendance Marked Missed',
+          message: 'The 15-minute attendance confirmation window has expired.',
+          severity: 'warning',
+          type: 'attendance',
+        });
+        return sendSuccess(res, 200, { id: req.params.id, status: 'missed' }, 'Attendance window expired. Booking marked missed.');
+      }
+
       patch.attendanceConfirmedAt = new Date();
     }
     if (nextStatus === 'missed') {
-      patch.attendanceNoShowAt = new Date();
+      patch.attendanceNoShowAt = now;
       if (!booking.attendanceNoShowNotifiedAt) {
-        patch.attendanceNoShowNotifiedAt = new Date();
+        patch.attendanceNoShowNotifiedAt = now;
       }
     }
 

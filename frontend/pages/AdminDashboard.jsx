@@ -1234,6 +1234,15 @@ export default function AdminDashboard({ user, userName }) {
   };
 
   const formatClockTime = (value, fallbackDate, invalidLabel = '-') => {
+    if (typeof value === 'string') {
+      const storedClock = value.match(/^(\d{2}:\d{2})$/);
+      if (storedClock) {
+        const [h, m] = storedClock[1].split(':').map(Number);
+        const hour12 = ((h + 11) % 12) + 1;
+        const suffix = h >= 12 ? 'PM' : 'AM';
+        return `${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+      }
+    }
     if (!value) return invalidLabel;
 
     if (typeof value === 'string') {
@@ -2428,8 +2437,9 @@ export default function AdminDashboard({ user, userName }) {
                     const normalizedStatus = String(row.status || '').trim().toLowerCase();
                     const isTerminalStatus = normalizedStatus === 'attended' || normalizedStatus === 'missed';
                     const isUpdating = attendanceUpdatingId && String(attendanceUpdatingId) === String(bookingId);
-                    const startLabel = formatClockTime(row.startTime, row.date);
-                    const endLabel = formatClockTime(row.endTime, row.date);
+                    const startLabel = formatClockTime(row.startClock || row.startTime, row.date);
+                    const endLabel = formatClockTime(row.endClock || row.endTime, row.date);
+                    const statusLabel = normalizedStatus === 'attended' ? 'Confirmed' : normalizedStatus === 'missed' ? 'Missed' : (row.status || 'expected');
                     return (
                       <div
                         key={bookingId}
@@ -2442,7 +2452,7 @@ export default function AdminDashboard({ user, userName }) {
                             {' - '}
                             {endLabel}
                           </p>
-                          <p className="text-xs text-gray-500 capitalize">Status: {row.status || 'expected'}</p>
+                          <p className="text-xs text-gray-500 capitalize">Status: {statusLabel}</p>
                         </div>
 
                         {isTerminalStatus ? (
@@ -2453,7 +2463,7 @@ export default function AdminDashboard({ user, userName }) {
                                 : 'bg-red-100 text-red-700'
                             }`}
                           >
-                            {normalizedStatus === 'attended' ? 'Attended' : 'Missed'}
+                            {normalizedStatus === 'attended' ? 'Confirmed' : 'Missed'}
                           </span>
                         ) : (
                           <div className="flex gap-2">
@@ -2462,7 +2472,7 @@ export default function AdminDashboard({ user, userName }) {
                               disabled={isUpdating}
                               className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-3 py-1 rounded transition"
                             >
-                              Present
+                              Confirm
                             </button>
                             <button
                               onClick={() => handleMarkAttendance(bookingId, 'missed')}
@@ -2512,8 +2522,8 @@ export default function AdminDashboard({ user, userName }) {
                     </thead>
                     <tbody>
                       {bookings.map((b) => {
-                        const startLabel = formatClockTime(b.startTime, b.date);
-                        const endLabel = formatClockTime(b.endTime, b.date);
+                        const startLabel = formatClockTime(b.startClock || b.startTime, b.date);
+                        const endLabel = formatClockTime(b.endClock || b.endTime, b.date);
                         const seats = Array.isArray(b.seats)
                           ? b.seats
                           : b.seat

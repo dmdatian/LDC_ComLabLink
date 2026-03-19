@@ -12,6 +12,8 @@ class Booking {
         studentName: bookingData.studentName,
         role: bookingData.role || 'student',
         date: bookingData.date,
+        startClock: bookingData.startClock || null,
+        endClock: bookingData.endClock || null,
         startTime: new Date(bookingData.startTime),
         endTime: new Date(bookingData.endTime),
         seats: bookingData.seats || [],

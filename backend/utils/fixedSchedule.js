@@ -12,6 +12,8 @@ const DAY_NAME_TO_INDEX = {
   saturday: 6,
 };
 
+const SCHOOL_TIMEZONE_OFFSET = '+08:00';
+
 const normalizeTime = (value) => {
   const text = String(value || '').trim();
   const match = text.match(/^(\d{1,2}):(\d{2})$/);
@@ -50,7 +52,7 @@ const getDayOfWeekFromDate = (date) => {
 const combineDateAndTime = (date, time) => {
   const normalizedTime = normalizeTime(time);
   if (!normalizedTime) return null;
-  const parsed = new Date(`${date}T${normalizedTime}:00`);
+  const parsed = new Date(`${date}T${normalizedTime}:00${SCHOOL_TIMEZONE_OFFSET}`);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
 };
