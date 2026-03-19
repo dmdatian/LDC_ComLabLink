@@ -18,6 +18,7 @@ router.get('/pending', authMiddleware, roleMiddleware(['admin']), authController
 router.put('/approve/:email', authMiddleware, roleMiddleware(['admin']), authController.approveUser);
 router.delete('/reject/:email', authMiddleware, roleMiddleware(['admin']), authController.rejectUser);
 router.get('/users', authMiddleware, roleMiddleware(['admin']), authController.getAllUsers);
+router.get('/users/bookable', authMiddleware, roleMiddleware(['admin', 'teacher']), authController.getBookableStudents);
 router.get('/users/inactive', authMiddleware, roleMiddleware(['admin']), authController.getInactiveUsers);
 router.post('/users/import-csv', authMiddleware, roleMiddleware(['admin']), authController.importUsersFromCsv);
 router.patch('/users/:uid', authMiddleware, roleMiddleware(['admin']), authController.updateUserAccount);

@@ -16,7 +16,7 @@ const {
   findFixedScheduleConflict,
 } = require('../utils/fixedSchedule');
 
-const MAX_BOOKINGS_PER_DAY_PER_USER = 2;
+const MAX_BOOKINGS_PER_WEEK_PER_USER = 2;
 const ATTENDANCE_CONFIRMATION_WINDOW_MINUTES = 15;
 const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'approved']);
 
@@ -30,6 +30,47 @@ const isWeekendDateKey = (dateKey) => {
   const utcDate = new Date(Date.UTC(year, month - 1, day));
   const dayOfWeek = utcDate.getUTCDay(); // 0 Sunday, 6 Saturday
   return dayOfWeek === 0 || dayOfWeek === 6;
+};
+
+const getWeekRangeForDateKey = (dateKey) => {
+  const match = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const base = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  const day = base.getUTCDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const weekStart = new Date(base);
+  weekStart.setUTCDate(base.getUTCDate() + diffToMonday);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+  return {
+    startDate: weekStart.toISOString().split('T')[0],
+    endDate: weekEnd.toISOString().split('T')[0],
+  };
+};
+
+const getAllowedStudentBookingWindow = (today = new Date()) => {
+  const todayKey = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+  const currentWeek = getWeekRangeForDateKey(todayKey);
+  if (!currentWeek) return null;
+
+  const nextWeekStart = new Date(`${currentWeek.startDate}T00:00:00Z`);
+  nextWeekStart.setUTCDate(nextWeekStart.getUTCDate() + 7);
+  const nextWeekEnd = new Date(`${currentWeek.endDate}T00:00:00Z`);
+  nextWeekEnd.setUTCDate(nextWeekEnd.getUTCDate() + 7);
+
+  return {
+    startDate: currentWeek.startDate,
+    endDate: nextWeekEnd.toISOString().split('T')[0],
+  };
+};
+
+const getCurrentMonthBookingWindow = (today = new Date()) => {
+  const localToday = new Date(today.getTime() - (today.getTimezoneOffset() * 60000));
+  const year = localToday.getUTCFullYear();
+  const month = localToday.getUTCMonth();
+  const startDate = new Date(Date.UTC(year, month, 1)).toISOString().split('T')[0];
+  const endDate = new Date(Date.UTC(year, month + 1, 0)).toISOString().split('T')[0];
+  return { startDate, endDate };
 };
 
 const normalizeSeats = (value) => {
@@ -119,6 +160,7 @@ const enrichBookingUserData = async (booking) => {
     gradeLevelId: booking.gradeLevelId || user.gradeLevelId || null,
     section: hasSection ? (booking.section || booking.sectionId) : (user.section || booking.section || booking.sectionId || null),
     sectionId: booking.sectionId || user.sectionId || null,
+    bookedByName: booking.bookedByName || booking.teacherName || user.name || 'Unknown',
   };
 };
 
@@ -297,7 +339,7 @@ const hasBlockedSeatConflict = async (seatIds, date, startDateTime, endDateTime)
 // SEAT BOOKING: create
 exports.createBooking = async (req, res) => {
   try {
-    const { date, startTime, endTime, startClock, endClock, seats, purpose, subject } = req.body;
+    const { date, startTime, endTime, startClock, endClock, seats, purpose, subject, studentId: requestedStudentId } = req.body;
     const normalizedSeats = normalizeSeats(seats);
     const normalizedStartClock = normalizeTime(startClock || String(startTime || '').slice(11, 16));
     const normalizedEndClock = normalizeTime(endClock || String(endTime || '').slice(11, 16));
@@ -315,9 +357,21 @@ exports.createBooking = async (req, res) => {
       return sendError(res, 400, 'Invalid seat selection', invalidSeats);
     }
 
+    const requesterRole = String(req.user.role || '').toLowerCase();
+    const isTeacherCreatingForStudent = requesterRole === 'teacher' && String(requestedStudentId || '').trim();
+    const targetStudentId = isTeacherCreatingForStudent ? String(requestedStudentId).trim() : String(req.user.uid || '').trim();
+    const targetStudent = await User.getById(targetStudentId);
+
+    if (!targetStudent) {
+      return sendError(res, 404, 'Selected student not found');
+    }
+    if (isTeacherCreatingForStudent && String(targetStudent.role || '').toLowerCase() !== 'student') {
+      return sendError(res, 400, 'Teachers can only book for student accounts');
+    }
+
     // Validate input
     const validation = await validateBookingData({ 
-      studentId: req.user.uid,
+      studentId: targetStudentId,
       date,
       startTime: startDateTime,
       endTime: endDateTime
@@ -331,20 +385,36 @@ exports.createBooking = async (req, res) => {
       return sendError(res, 400, 'Bookings are not allowed on Saturday or Sunday');
     }
 
-    const existingUserBookings = await Booking.getByStudentId(req.user.uid);
-    await applyAttendanceAutomation(existingUserBookings, { reminderUserId: req.user.uid });
+    if (isTeacherCreatingForStudent) {
+      const allowedTeacherWindow = getCurrentMonthBookingWindow(new Date());
+      if (allowedTeacherWindow && (date < allowedTeacherWindow.startDate || date > allowedTeacherWindow.endDate)) {
+        return sendError(res, 409, 'Teacher bookings for students are only allowed within the current month.');
+      }
+    } else if (requesterRole !== 'teacher') {
+      const allowedWindow = getAllowedStudentBookingWindow(new Date());
+      if (allowedWindow && (date < allowedWindow.startDate || date > allowedWindow.endDate)) {
+        return sendError(res, 409, 'Students can only book for this week or next week.');
+      }
+    }
 
-    const dailyBookingsCount = existingUserBookings.filter((booking) => {
-      if (!isActiveBookingStatus(booking?.status)) return false;
-      return booking?.date === date;
-    }).length;
+    const existingUserBookings = await Booking.getByStudentId(targetStudentId);
+    await applyAttendanceAutomation(existingUserBookings, { reminderUserId: targetStudentId });
 
-    if (dailyBookingsCount >= MAX_BOOKINGS_PER_DAY_PER_USER) {
-      return sendError(
-        res,
-        409,
-        'Booking limit reached. You can only create up to 2 bookings per day.'
-      );
+    if (requesterRole !== 'teacher' && !isTeacherCreatingForStudent) {
+      const weekRange = getWeekRangeForDateKey(date);
+      const weeklyBookingsCount = existingUserBookings.filter((booking) => {
+        if (!isActiveBookingStatus(booking?.status)) return false;
+        if (!weekRange) return false;
+        return String(booking?.date || '') >= weekRange.startDate && String(booking?.date || '') <= weekRange.endDate;
+      }).length;
+
+      if (weeklyBookingsCount >= MAX_BOOKINGS_PER_WEEK_PER_USER) {
+        return sendError(
+          res,
+          409,
+          'Booking limit reached. Only 2 bookings are allowed per week.'
+        );
+      }
     }
 
     const fixedScheduleConflict = await findFixedScheduleConflict(db, date, startDateTime, endDateTime);
@@ -455,9 +525,14 @@ exports.createBooking = async (req, res) => {
 
     // --- Create booking ---
     const bookingResult = await Booking.create({
-      studentId: req.user.uid,
-      studentName: req.user.name || 'Unknown',
-      role: req.user.role || 'student',
+      studentId: targetStudentId,
+      studentName: targetStudent.name || req.user.name || 'Unknown',
+      role: String(targetStudent.role || requesterRole || 'student').toLowerCase(),
+      bookedById: req.user.uid,
+      bookedByName: req.user.name || targetStudent.name || 'Unknown',
+      bookedByRole: requesterRole || 'student',
+      teacherId: requesterRole === 'teacher' ? req.user.uid : null,
+      teacherName: requesterRole === 'teacher' ? (req.user.name || null) : null,
       date,
       startClock: normalizedStartClock,
       endClock: normalizedEndClock,
@@ -466,10 +541,10 @@ exports.createBooking = async (req, res) => {
       seats: normalizedSeats,
       purpose,
       subject,
-      gradeLevelId: req.user.gradeLevelId || null,
-      gradeLevel: req.user.gradeLevel || null,
-      sectionId: req.user.sectionId || null,
-      section: req.user.section || null,
+      gradeLevelId: targetStudent.gradeLevelId || null,
+      gradeLevel: targetStudent.gradeLevel || null,
+      sectionId: targetStudent.sectionId || null,
+      section: targetStudent.section || null,
       status: 'approved',
       attendanceDeadlineAt,
     });
@@ -485,10 +560,12 @@ exports.createBooking = async (req, res) => {
 
     await createBookingNotification({
       id: bookingResult.id,
-      studentId: req.user.uid,
+      studentId: targetStudentId,
     }, {
       title: 'Booking Approved',
-      message: `Your booking for ${date} was saved successfully.`,
+      message: requesterRole === 'teacher' && targetStudentId !== String(req.user.uid || '').trim()
+        ? `A booking was saved for you on ${date} by ${req.user.name || 'your teacher'}.`
+        : `Your booking for ${date} was saved successfully.`,
       severity: 'info',
       type: 'booking',
     });
@@ -803,7 +880,21 @@ exports.deleteFixedScheduleEntry = async (req, res) => {
 // SEAT BOOKING: get current user's bookings
 exports.getMyBookings = async (req, res) => {
   try {
-    const rawBookings = await Booking.getByStudentId(req.user.uid);
+    const requesterRole = String(req.user.role || '').toLowerCase();
+    let rawBookings = await Booking.getByStudentId(req.user.uid);
+
+    if (requesterRole === 'teacher') {
+      const teacherCreated = await Booking.getByBookedById(req.user.uid);
+      const merged = [...rawBookings, ...teacherCreated];
+      const seen = new Set();
+      rawBookings = merged.filter((booking) => {
+        const id = String(booking.id || '');
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+    }
+
     const bookings = await Promise.all(rawBookings.map((booking) => enrichBookingUserData(booking)));
     await applyAttendanceAutomation(bookings, { reminderUserId: req.user.uid });
     sendSuccess(res, 200, bookings, 'Bookings retrieved');
@@ -819,7 +910,9 @@ exports.getBookingById = async (req, res) => {
     const booking = await Booking.getById(req.params.id);
     if (!booking) return sendError(res, 404, 'Booking not found');
 
-    if (booking.studentId !== req.user.uid && req.user.role !== 'admin') {
+    const isOwner = String(booking.studentId || '').trim() === String(req.user.uid || '').trim();
+    const isCreator = String(booking.bookedById || '').trim() === String(req.user.uid || '').trim();
+    if (!isOwner && !isCreator && req.user.role !== 'admin') {
       return sendError(res, 403, 'Unauthorized');
     }
 
@@ -987,7 +1080,9 @@ exports.cancelBooking = async (req, res) => {
     const booking = await Booking.getById(req.params.id);
     if (!booking) return sendError(res, 404, 'Booking not found');
 
-    if (booking.studentId !== req.user.uid && req.user.role !== 'admin') {
+    const isOwner = String(booking.studentId || '').trim() === String(req.user.uid || '').trim();
+    const isCreator = String(booking.bookedById || '').trim() === String(req.user.uid || '').trim();
+    if (!isOwner && !isCreator && req.user.role !== 'admin') {
       return sendError(res, 403, 'Unauthorized');
     }
 

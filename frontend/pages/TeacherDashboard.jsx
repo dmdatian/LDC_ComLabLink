@@ -402,12 +402,19 @@ export default function TeacherDashboard({ user, userName }) {
                         : [];
                     const status = String(booking.status || 'pending').toLowerCase();
                     const canCancel = !TERMINAL_BOOKING_STATUSES.has(status);
-                    const canConfirm = canConfirmAttendance(booking);
+                    const canConfirm = String(booking.studentId || '').trim() === String(user?.uid || '').trim()
+                      && canConfirmAttendance(booking);
 
                     return (
                       <div key={booking.id} className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div>
                           <p className="font-semibold">
+                            {booking.teacherName ? (booking.teacherName || userName || user?.displayName || user?.name || 'Teacher') : (booking.studentName || 'Teacher')}
+                          </p>
+                          {booking.teacherName && (
+                            <p className="text-sm text-gray-600">Student: {booking.studentName || '-'}</p>
+                          )}
+                          <p className="text-sm font-medium text-gray-700">
                             {booking.date || '-'}{' '}
                             {formatStoredClock(booking, 'startClock')}
                             {' - '}
@@ -449,10 +456,10 @@ export default function TeacherDashboard({ user, userName }) {
         {activeSection === 'booking' && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold mb-6">Booking</h2>
-            <SeatBooking
+                    <SeatBooking
               userName={userName || user?.displayName || user?.name || 'Teacher'}
               onBookingCreated={handleBookingCreated}
-              hideAcademicFields
+              teacherBookingMode
             />
           </section>
         )}

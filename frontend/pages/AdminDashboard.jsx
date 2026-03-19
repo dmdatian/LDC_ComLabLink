@@ -2484,13 +2484,17 @@ export default function AdminDashboard({ user, userName }) {
                         className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
                       >
                         <div>
-                          <p className="font-semibold">{row.studentName || 'Unknown student'}</p>
+                          <p className="font-semibold">{row.teacherName || row.bookedByName || row.studentName || 'Unknown user'}</p>
+                          {row.teacherName && (
+                            <p className="text-sm text-gray-600">Student: {row.studentName || 'Unknown student'}</p>
+                          )}
                           <p className="text-sm text-gray-600">
                             {startLabel}
                             {' - '}
                             {endLabel}
                           </p>
                           <p className="text-xs text-gray-500 capitalize">Status: {statusLabel}</p>
+                          <p className="text-xs text-gray-500 capitalize">User: {row.role || 'student'}</p>
                           {!isTerminalStatus && !canUpdateAttendance && (
                             <p className="text-xs text-amber-700 mt-1">
                               Attendance can only be updated during the scheduled 15-minute confirmation window.

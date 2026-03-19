@@ -11,6 +11,11 @@ class Booking {
         studentId: bookingData.studentId,
         studentName: bookingData.studentName,
         role: bookingData.role || 'student',
+        bookedById: bookingData.bookedById || bookingData.studentId || null,
+        bookedByName: bookingData.bookedByName || bookingData.studentName || null,
+        bookedByRole: bookingData.bookedByRole || bookingData.role || 'student',
+        teacherId: bookingData.teacherId || null,
+        teacherName: bookingData.teacherName || null,
         date: bookingData.date,
         startClock: bookingData.startClock || null,
         endClock: bookingData.endClock || null,
@@ -72,6 +77,18 @@ class Booking {
         .get();
       const bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       return bookings.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async getByBookedById(bookedById) {
+    try {
+      const snapshot = await db.collection(COLLECTION)
+        .where('bookedById', '==', bookedById)
+        .get();
+      const bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return bookings.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
     } catch (error) {
       throw error;
     }

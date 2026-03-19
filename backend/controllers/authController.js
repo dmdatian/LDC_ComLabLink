@@ -317,6 +317,29 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
+exports.getBookableStudents = async (req, res) => {
+  try {
+    const users = await User.getAllUsers();
+    const students = users
+      .filter((item) => String(item.role || '').toLowerCase() === 'student')
+      .filter((item) => String(item.status || 'approved').toLowerCase() === 'approved')
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+      .map((item) => ({
+        uid: item.uid,
+        name: item.name || item.email || item.uid,
+        email: item.email || '',
+        gradeLevel: item.gradeLevel || null,
+        gradeLevelId: item.gradeLevelId || null,
+        section: item.section || null,
+        sectionId: item.sectionId || null,
+      }));
+    sendSuccess(res, 200, students, 'Bookable students retrieved');
+  } catch (error) {
+    console.error('Get bookable students error:', error);
+    sendError(res, 500, 'Failed to get bookable students', error.message);
+  }
+};
+
 exports.getInactiveUsers = async (req, res) => {
   try {
     const users = await User.getInactiveUsers();

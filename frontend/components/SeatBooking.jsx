@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { seatsAPI } from '../utils/api';
-import { authAPI } from '../utils/api';
+import { seatsAPI, authAPI } from '../utils/api';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import './SeatBooking.css';
@@ -96,7 +95,7 @@ const isWeekendDate = (dateKey) => {
   return day === 0 || day === 6;
 };
 
-export default function SeatBooking({ userName, onBookingCreated, hideAcademicFields = false }) {
+export default function SeatBooking({ userName, onBookingCreated, hideAcademicFields = false, teacherBookingMode = false }) {
   const toLocalDateKey = (dateObj = new Date()) => {
     const year = dateObj.getFullYear();
     const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -123,6 +122,8 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   const [statusMessage, setStatusMessage] = useState('');
   const [isFixedScheduleBlocked, setIsFixedScheduleBlocked] = useState(false);
   const [profileLocked, setProfileLocked] = useState(false);
+  const [studentOptions, setStudentOptions] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
 
   // Set initial name
   useEffect(() => {
@@ -147,8 +148,10 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
         ));
 
         setName(profile.name || userName || '');
-        setGradeLevelId(nextGradeId);
-        setSectionId(profile.sectionId || matchedSection?.id || '');
+        if (!teacherBookingMode) {
+          setGradeLevelId(nextGradeId);
+          setSectionId(profile.sectionId || matchedSection?.id || '');
+        }
         setProfileLocked(true);
       } catch (err) {
         setName(userName || '');
@@ -157,7 +160,45 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
     };
 
     fetchProfile();
-  }, [userName, gradeLevels, sections]);
+  }, [userName, gradeLevels, sections, teacherBookingMode]);
+
+  useEffect(() => {
+    if (!teacherBookingMode) return;
+
+    const fetchStudents = async () => {
+      try {
+        const response = await authAPI.getBookableStudents();
+        const rows = Array.isArray(response?.data?.data) ? response.data.data : [];
+        setStudentOptions(rows);
+      } catch (err) {
+        setStudentOptions([]);
+      }
+    };
+
+    fetchStudents();
+  }, [teacherBookingMode]);
+
+  useEffect(() => {
+    if (!teacherBookingMode) return;
+    const selectedStudent = studentOptions.find((item) => item.uid === selectedStudentId);
+    if (!selectedStudent) {
+      setGradeLevelId('');
+      setSectionId('');
+      return;
+    }
+
+    const matchedGrade = gradeLevels.find((item) => {
+      const gradeText = String(selectedStudent.gradeLevel || '').trim().toLowerCase();
+      return gradeText && String(item.name || item.id).trim().toLowerCase() === gradeText;
+    });
+    const matchedSection = sections.find((item) => {
+      const sectionText = String(selectedStudent.section || '').trim().toLowerCase();
+      return sectionText && String(item.name || item.id).trim().toLowerCase() === sectionText;
+    });
+
+    setGradeLevelId(selectedStudent.gradeLevelId || matchedGrade?.id || '');
+    setSectionId(selectedStudent.sectionId || matchedSection?.id || '');
+  }, [teacherBookingMode, selectedStudentId, studentOptions, gradeLevels, sections]);
 
   // Fetch subjects from backend via seatsAPI
   useEffect(() => {
@@ -234,6 +275,11 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   const selectedSection = useMemo(
     () => sections.find((item) => item.id === sectionId) || null,
     [sections, sectionId]
+  );
+
+  const selectedStudent = useMemo(
+    () => studentOptions.find((item) => item.uid === selectedStudentId) || null,
+    [studentOptions, selectedStudentId]
   );
 
   const leftSeats = useMemo(
@@ -380,14 +426,19 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
     setIsFixedScheduleBlocked(false);
     const trimmedPurpose = purpose.trim();
     const trimmedSubject = subject.trim();
-    const needsAcademicFields = !hideAcademicFields;
+    const needsAcademicFields = !hideAcademicFields || teacherBookingMode;
 
     if (!name.trim() || !selectedSeat || !date || !startTime || !endTime || !trimmedPurpose || !trimmedSubject) {
       setStatusMessage('Please fill all required fields and select a seat.');
       return;
     }
 
-    if (needsAcademicFields && (!selectedGrade || !selectedSection)) {
+    if (teacherBookingMode && !selectedStudentId) {
+      setStatusMessage('Please select a student for this booking.');
+      return;
+    }
+
+    if (!teacherBookingMode && needsAcademicFields && (!selectedGrade || !selectedSection)) {
       setStatusMessage('Please fill all required fields and select a seat.');
       return;
     }
@@ -412,20 +463,8 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
     }
 
     try {
-      const myBookingsResponse = await seatsAPI.getMySeats();
-      const myBookings = Array.isArray(myBookingsResponse?.data?.data) ? myBookingsResponse.data.data : [];
-
-      const dailyBookingsCount = myBookings.filter((booking) => {
-        if (!isActiveBookingStatus(booking?.status)) return false;
-        return booking?.date === date;
-      }).length;
-
-      if (dailyBookingsCount >= 2) {
-        setStatusMessage('Booking limit reached. You can only create up to 2 bookings per day.');
-        return;
-      }
-
       const createResponse = await seatsAPI.createSeatBooking({
+        studentId: teacherBookingMode ? selectedStudentId : undefined,
         seats: [selectedSeat],
         date,
         startClock: startTime,
@@ -448,8 +487,12 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       setSelectedSeat('');
       setPurpose('');
       setSubject('');
-      setGradeLevelId('');
-      setSectionId('');
+      if (teacherBookingMode) {
+        setSelectedStudentId('');
+      } else {
+        setGradeLevelId('');
+        setSectionId('');
+      }
       fetchSeats();
       if (onBookingCreated) onBookingCreated();
     } catch (err) {
@@ -539,10 +582,28 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
 
         <div>
           <label>Purpose</label>
-          <input value={purpose} onChange={(e) => setPurpose(e.target.value)} />
+          <input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder={teacherBookingMode ? 'Research, Project, Special Activity' : ''} />
         </div>
 
-        {!hideAcademicFields && profileLocked && (
+        {teacherBookingMode && (
+          <div className="full-span">
+            <label>Student</label>
+            <select
+              value={selectedStudentId}
+              onChange={(e) => setSelectedStudentId(e.target.value)}
+              required
+            >
+              <option value="">Select student</option>
+              {studentOptions.map((student) => (
+                <option key={student.uid} value={student.uid}>
+                  {student.name} {student.gradeLevel || student.section ? `- ${[student.gradeLevel, student.section].filter(Boolean).join(' / ')}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {!hideAcademicFields && !teacherBookingMode && profileLocked && (
           <>
             <div>
               <label>Grade Level</label>
@@ -564,7 +625,29 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
           </>
         )}
 
-        {!hideAcademicFields && !profileLocked && (
+        {!hideAcademicFields && teacherBookingMode && (
+          <>
+            <div>
+              <label>Grade Level</label>
+              <input
+                value={selectedGrade?.name || selectedStudent?.gradeLevel || 'Assigned by admin'}
+                readOnly
+                className="bg-gray-100 text-gray-700 cursor-not-allowed"
+              />
+            </div>
+
+            <div>
+              <label>Section</label>
+              <input
+                value={selectedSection?.name || selectedStudent?.section || 'Assigned by admin'}
+                readOnly
+                className="bg-gray-100 text-gray-700 cursor-not-allowed"
+              />
+            </div>
+          </>
+        )}
+
+        {!hideAcademicFields && !teacherBookingMode && !profileLocked && (
           <>
             <div>
               <label>Grade Level</label>
