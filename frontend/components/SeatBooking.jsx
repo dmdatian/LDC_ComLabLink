@@ -134,9 +134,21 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       try {
         const response = await authAPI.getProfile();
         const profile = response?.data?.data || {};
+        const profileGradeText = String(profile.gradeLevel || '').trim().toLowerCase();
+        const profileSectionText = String(profile.section || '').trim().toLowerCase();
+        const matchedGrade = gradeLevels.find((item) => (
+          profileGradeText
+          && String(item.name || item.id).trim().toLowerCase() === profileGradeText
+        ));
+        const nextGradeId = profile.gradeLevelId || matchedGrade?.id || '';
+        const matchedSection = sections.find((item) => (
+          profileSectionText
+          && String(item.name || item.id).trim().toLowerCase() === profileSectionText
+        ));
+
         setName(profile.name || userName || '');
-        setGradeLevelId(profile.gradeLevelId || '');
-        setSectionId(profile.sectionId || '');
+        setGradeLevelId(nextGradeId);
+        setSectionId(profile.sectionId || matchedSection?.id || '');
         setProfileLocked(true);
       } catch (err) {
         setName(userName || '');
@@ -145,7 +157,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
     };
 
     fetchProfile();
-  }, [userName]);
+  }, [userName, gradeLevels, sections]);
 
   // Fetch subjects from backend via seatsAPI
   useEffect(() => {
@@ -212,6 +224,16 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   const filteredSections = useMemo(
     () => sections.filter((item) => item.gradeLevelId === gradeLevelId),
     [sections, gradeLevelId]
+  );
+
+  const selectedGrade = useMemo(
+    () => gradeLevels.find((item) => item.id === gradeLevelId) || null,
+    [gradeLevels, gradeLevelId]
+  );
+
+  const selectedSection = useMemo(
+    () => sections.find((item) => item.id === sectionId) || null,
+    [sections, sectionId]
   );
 
   const leftSeats = useMemo(
@@ -358,8 +380,6 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
     setIsFixedScheduleBlocked(false);
     const trimmedPurpose = purpose.trim();
     const trimmedSubject = subject.trim();
-    const selectedGrade = gradeLevels.find((item) => item.id === gradeLevelId) || null;
-    const selectedSection = sections.find((item) => item.id === sectionId) || null;
     const needsAcademicFields = !hideAcademicFields;
 
     if (!name.trim() || !selectedSeat || !date || !startTime || !endTime || !trimmedPurpose || !trimmedSubject) {
@@ -522,7 +542,29 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
           <input value={purpose} onChange={(e) => setPurpose(e.target.value)} />
         </div>
 
-        {!hideAcademicFields && (
+        {!hideAcademicFields && profileLocked && (
+          <>
+            <div>
+              <label>Grade Level</label>
+              <input
+                value={selectedGrade?.name || selectedGrade?.id || 'Assigned by admin'}
+                readOnly
+                className="bg-gray-100 text-gray-700 cursor-not-allowed"
+              />
+            </div>
+
+            <div>
+              <label>Section</label>
+              <input
+                value={selectedSection?.name || selectedSection?.id || 'Assigned by admin'}
+                readOnly
+                className="bg-gray-100 text-gray-700 cursor-not-allowed"
+              />
+            </div>
+          </>
+        )}
+
+        {!hideAcademicFields && !profileLocked && (
           <>
             <div>
               <label>Grade Level</label>
@@ -532,7 +574,6 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
                   setGradeLevelId(e.target.value);
                   setSectionId('');
                 }}
-                disabled={profileLocked}
                 required
               >
                 <option value="">Select grade level</option>
@@ -549,7 +590,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
               <select
                 value={sectionId}
                 onChange={(e) => setSectionId(e.target.value)}
-                disabled={!gradeLevelId || profileLocked}
+                disabled={!gradeLevelId}
                 required
               >
                 <option value="">{gradeLevelId ? 'Select section' : 'Select grade level first'}</option>
