@@ -99,6 +99,29 @@ const createBookingNotification = async (booking, payload) => {
   });
 };
 
+const enrichBookingUserData = async (booking) => {
+  if (!booking) return booking;
+  const hasName = String(booking.studentName || '').trim();
+  const hasGrade = String(booking.gradeLevel || booking.gradeLevelId || '').trim();
+  const hasSection = String(booking.section || booking.sectionId || '').trim();
+  if (hasName && hasGrade && hasSection) return booking;
+
+  const studentId = String(booking.studentId || '').trim();
+  if (!studentId) return booking;
+
+  const user = await User.getById(studentId);
+  if (!user) return booking;
+
+  return {
+    ...booking,
+    studentName: hasName || user.name || 'Unknown',
+    gradeLevel: hasGrade ? (booking.gradeLevel || booking.gradeLevelId) : (user.gradeLevel || booking.gradeLevel || booking.gradeLevelId || null),
+    gradeLevelId: booking.gradeLevelId || user.gradeLevelId || null,
+    section: hasSection ? (booking.section || booking.sectionId) : (user.section || booking.section || booking.sectionId || null),
+    sectionId: booking.sectionId || user.sectionId || null,
+  };
+};
+
 const applyAttendanceAutomation = async (bookings = [], opts = {}) => {
   const now = new Date();
   const reminderUserId = String(opts.reminderUserId || '').trim();
@@ -780,7 +803,8 @@ exports.deleteFixedScheduleEntry = async (req, res) => {
 // SEAT BOOKING: get current user's bookings
 exports.getMyBookings = async (req, res) => {
   try {
-    const bookings = await Booking.getByStudentId(req.user.uid);
+    const rawBookings = await Booking.getByStudentId(req.user.uid);
+    const bookings = await Promise.all(rawBookings.map((booking) => enrichBookingUserData(booking)));
     await applyAttendanceAutomation(bookings, { reminderUserId: req.user.uid });
     sendSuccess(res, 200, bookings, 'Bookings retrieved');
   } catch (error) {
@@ -1000,11 +1024,13 @@ exports.getAllBookings = async (req, res) => {
     let bookings;
 
     if (date) {
-      bookings = await Booking.getByDate(date);
+      const rows = await Booking.getByDate(date);
+      bookings = await Promise.all(rows.map((booking) => enrichBookingUserData(booking)));
       await applyAttendanceAutomation(bookings);
     } else {
       const snapshot = await require('../config/database').db.collection('workspace_booking').get();
-      bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const rows = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      bookings = await Promise.all(rows.map((booking) => enrichBookingUserData(booking)));
       await applyAttendanceAutomation(bookings);
     }
 

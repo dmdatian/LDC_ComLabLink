@@ -150,6 +150,7 @@ export default function AdminDashboard({ user, userName }) {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceError, setAttendanceError] = useState('');
   const [attendanceUpdatingId, setAttendanceUpdatingId] = useState('');
+  const [attendanceNow, setAttendanceNow] = useState(Date.now());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -159,6 +160,24 @@ export default function AdminDashboard({ user, userName }) {
     refreshFeedback();
     fetchSectionData();
   }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setAttendanceNow(Date.now());
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (activeSection !== 'home') return undefined;
+
+    const timer = window.setInterval(() => {
+      fetchAttendance(selectedDate);
+    }, 60000);
+
+    return () => window.clearInterval(timer);
+  }, [activeSection, selectedDate]);
 
   useEffect(() => {
     if (activeSection === 'seats' || activeSection === 'fixed-schedule') {
@@ -237,6 +256,24 @@ export default function AdminDashboard({ user, userName }) {
     } finally {
       setAttendanceUpdatingId('');
     }
+  };
+
+  const getAttendanceDeadlineForRow = (row) => {
+    const start = toDashboardDate(row?.startTime || row?.startClock || row?.start, row?.date);
+    if (!start) return null;
+    const stored = toDashboardDate(row?.attendanceDeadlineAt, row?.date);
+    if (stored) return stored;
+    return new Date(start.getTime() + 15 * 60 * 1000);
+  };
+
+  const canAdminUpdateAttendance = (row) => {
+    const status = String(row?.status || '').trim().toLowerCase();
+    if (status === 'attended' || status === 'missed' || status === 'cancelled') return false;
+    const now = new Date(attendanceNow);
+    const start = toDashboardDate(row?.startTime || row?.startClock || row?.start, row?.date);
+    const deadline = getAttendanceDeadlineForRow(row);
+    if (!start || !deadline) return false;
+    return now >= start && now <= deadline;
   };
 
   // USERS: pending approvals
@@ -2437,6 +2474,7 @@ export default function AdminDashboard({ user, userName }) {
                     const normalizedStatus = String(row.status || '').trim().toLowerCase();
                     const isTerminalStatus = normalizedStatus === 'attended' || normalizedStatus === 'missed';
                     const isUpdating = attendanceUpdatingId && String(attendanceUpdatingId) === String(bookingId);
+                    const canUpdateAttendance = canAdminUpdateAttendance(row);
                     const startLabel = formatClockTime(row.startClock || row.startTime, row.date);
                     const endLabel = formatClockTime(row.endClock || row.endTime, row.date);
                     const statusLabel = normalizedStatus === 'attended' ? 'Confirmed' : normalizedStatus === 'missed' ? 'Missed' : (row.status || 'expected');
@@ -2453,6 +2491,11 @@ export default function AdminDashboard({ user, userName }) {
                             {endLabel}
                           </p>
                           <p className="text-xs text-gray-500 capitalize">Status: {statusLabel}</p>
+                          {!isTerminalStatus && !canUpdateAttendance && (
+                            <p className="text-xs text-amber-700 mt-1">
+                              Attendance can only be updated during the scheduled 15-minute confirmation window.
+                            </p>
+                          )}
                         </div>
 
                         {isTerminalStatus ? (
@@ -2469,14 +2512,14 @@ export default function AdminDashboard({ user, userName }) {
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleMarkAttendance(bookingId, 'present')}
-                              disabled={isUpdating}
+                              disabled={isUpdating || !canUpdateAttendance}
                               className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-3 py-1 rounded transition"
                             >
                               Confirm
                             </button>
                             <button
                               onClick={() => handleMarkAttendance(bookingId, 'missed')}
-                              disabled={isUpdating}
+                              disabled={isUpdating || !canUpdateAttendance}
                               className="bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white px-3 py-1 rounded transition"
                             >
                               Missed
