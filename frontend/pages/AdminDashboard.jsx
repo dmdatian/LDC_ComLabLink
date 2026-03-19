@@ -47,6 +47,23 @@ export default function AdminDashboard({ user, userName }) {
     start.setUTCDate(start.getUTCDate() + 7);
     return start.toISOString().split('T')[0];
   };
+  const toDashboardDate = (value, fallbackDate) => {
+    if (!value && !fallbackDate) return null;
+    if (value instanceof Date) return value;
+    if (value?.toDate) return value.toDate();
+    if (value?.seconds) return new Date(value.seconds * 1000);
+    if (value?._seconds) return new Date(value._seconds * 1000);
+    if (typeof value === 'string' && value.includes('T')) {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    if (fallbackDate && typeof value === 'string' && /^\d{2}:\d{2}/.test(value)) {
+      const parsed = new Date(`${fallbackDate}T${value}:00`);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
   const defaultWeeklyStartDate = toLocalDateKey(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
   const [bookings, setBookings] = useState([]);
   const [report, setReport] = useState(null);
@@ -178,8 +195,24 @@ export default function AdminDashboard({ user, userName }) {
     try {
       const response = await attendanceAPI.getByDate(date);
       const rows = Array.isArray(response.data.data) ? response.data.data : [];
+      const now = new Date();
+      const isToday = date === toLocalDateKey(now);
       setAttendanceRows(
-        rows.filter((row) => String(row?.status || '').trim().toLowerCase() !== 'cancelled')
+        rows
+          .filter((row) => String(row?.status || '').trim().toLowerCase() !== 'cancelled')
+          .sort((a, b) => {
+            const aStart = toDashboardDate(a?.startTime || a?.start, a?.date);
+            const bStart = toDashboardDate(b?.startTime || b?.start, b?.date);
+            const aTime = aStart ? aStart.getTime() : Number.MAX_SAFE_INTEGER;
+            const bTime = bStart ? bStart.getTime() : Number.MAX_SAFE_INTEGER;
+
+            if (!isToday) return aTime - bTime;
+
+            const aUpcoming = aTime >= now.getTime();
+            const bUpcoming = bTime >= now.getTime();
+            if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+            return aTime - bTime;
+          })
       );
     } catch (err) {
       setAttendanceError(err.response?.data?.message || 'Failed to load attendance');

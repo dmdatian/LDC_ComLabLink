@@ -62,6 +62,12 @@ const getAttendanceDeadline = (booking) => {
   return new Date(start.getTime() + ATTENDANCE_CONFIRMATION_WINDOW_MINUTES * 60 * 1000);
 };
 
+const getAttendanceReminderStart = (booking) => {
+  const start = toDate(booking?.startTime);
+  if (!start) return null;
+  return new Date(start.getTime() - ATTENDANCE_CONFIRMATION_WINDOW_MINUTES * 60 * 1000);
+};
+
 const createAttendanceNotification = async (booking, payload) => {
   const userId = String(booking?.studentId || '').trim();
   if (!userId) return;
@@ -92,7 +98,8 @@ const applyAttendanceAutomation = async (bookings = [], opts = {}) => {
 
     const start = toDate(booking?.startTime);
     const deadline = getAttendanceDeadline(booking);
-    if (!start || !deadline) continue;
+    const reminderStart = getAttendanceReminderStart(booking);
+    if (!start || !deadline || !reminderStart) continue;
 
     const patch = {};
     if (!booking.attendanceDeadlineAt) patch.attendanceDeadlineAt = deadline;
@@ -101,8 +108,8 @@ const applyAttendanceAutomation = async (bookings = [], opts = {}) => {
     if (
       reminderUserId &&
       String(booking.studentId || '').trim() === reminderUserId &&
-      now >= start &&
-      now <= deadline &&
+      now >= reminderStart &&
+      now <= start &&
       !booking.attendanceConfirmedAt &&
       !booking.attendanceReminderNotifiedAt
     ) {
@@ -123,8 +130,8 @@ const applyAttendanceAutomation = async (bookings = [], opts = {}) => {
 
     if (patch.attendanceReminderNotifiedAt) {
       await createAttendanceNotification(booking, {
-        title: 'Attendance Confirmation Needed',
-        message: `Confirm your attendance between ${formatClock(start)} and ${formatClock(deadline)}.`,
+        title: 'Booking Starts Soon',
+        message: `Your booking starts at ${formatClock(start)}. Confirm attendance within 15 minutes after it starts.`,
         severity: 'warning',
         type: 'attendance',
       });
@@ -911,11 +918,17 @@ exports.cancelBooking = async (req, res) => {
       return sendError(res, 403, 'Unauthorized');
     }
 
-    await Booking.update(req.params.id, { status: 'cancelled' });
+    const cancelReason = String(req.body?.reason || '').trim();
+    await Booking.update(req.params.id, {
+      status: 'cancelled',
+      cancelReason: cancelReason || null,
+    });
 
     await createBookingNotification(booking, {
       title: 'Booking Cancelled',
-      message: `Your booking for ${booking.date || 'the selected date'} was cancelled.`,
+      message: cancelReason
+        ? `Your booking for ${booking.date || 'the selected date'} was cancelled. Reason: ${cancelReason}`
+        : `Your booking for ${booking.date || 'the selected date'} was cancelled.`,
       severity: 'warning',
       type: 'booking',
     });

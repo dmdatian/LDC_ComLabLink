@@ -49,7 +49,7 @@ export const seatsAPI = {
   createSeatBooking: (payload) => api.post('/seats', payload),
   getMySeats: () => api.get('/seats/mine'),
   getSeatById: (id) => api.get(`/seats/${id}`),
-  cancelSeatBooking: (id) => api.patch(`/seats/${id}/cancel`),
+  cancelSeatBooking: (id, reason = '') => api.patch(`/seats/${id}/cancel`, { reason }),
   confirmAttendance: (id) => api.patch(`/seats/${id}/confirm-attendance`),
   getAllSeats: (date) => api.get('/seats', { params: { date } }),
   getAllSeatsAdmin: () => api.get('/seats/all'),

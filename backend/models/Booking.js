@@ -28,6 +28,7 @@ class Booking {
         attendanceNoShowAt: bookingData.attendanceNoShowAt ? new Date(bookingData.attendanceNoShowAt) : null,
         attendanceNoShowNotifiedAt: bookingData.attendanceNoShowNotifiedAt ? new Date(bookingData.attendanceNoShowNotifiedAt) : null,
         rejectionReason: null,
+        cancelReason: bookingData.cancelReason || null,
         suggestedSlot: null,
         createdAt: new Date(),
         updatedAt: new Date(),

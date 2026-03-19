@@ -18,6 +18,7 @@ export default function StudentDashboard({ user, userName }) {
   const [feedbackStatus, setFeedbackStatus] = useState('');
   const [activeSection, setActiveSection] = useState('home');
   const [pendingCancelId, setPendingCancelId] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
   const [notifications, setNotifications] = useState([]);
   const [requirePasswordChange, setRequirePasswordChange] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -114,12 +115,15 @@ export default function StudentDashboard({ user, userName }) {
   // BOOKINGS API: cancel
   const handleCancelBooking = async (bookingId) => {
     try {
-      await seatsAPI.cancelSeatBooking(bookingId);
+      await seatsAPI.cancelSeatBooking(bookingId, cancelReason);
       setBookings(bookings.filter(b => b.id !== bookingId));
+      await fetchNotifications();
       setPendingCancelId(null);
+      setCancelReason('');
     } catch (err) {
       setError('Failed to cancel booking');
       setPendingCancelId(null);
+      setCancelReason('');
     }
   };
 
@@ -252,17 +256,19 @@ export default function StudentDashboard({ user, userName }) {
           >
             Feedback
           </button>
-          <button
-            onClick={() => {
-              setActiveSection('account');
-              setMobileMenuOpen(false);
-            }}
-            className={`w-full text-left px-4 py-2 rounded transition ${
-              activeSection === 'account' ? 'bg-blue-600' : 'hover:bg-blue-600'
-            }`}
-          >
-            Account
-          </button>
+          {requirePasswordChange && (
+            <button
+              onClick={() => {
+                setActiveSection('account');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full text-left px-4 py-2 rounded transition ${
+                activeSection === 'account' ? 'bg-blue-600' : 'hover:bg-blue-600'
+              }`}
+            >
+              Account
+            </button>
+          )}
         </nav>
 
         <div className="mt-auto">
@@ -448,11 +454,21 @@ export default function StudentDashboard({ user, userName }) {
           <div className="fixed inset-0 z-30 bg-black/50 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl p-6 max-w-sm w-full">
               <h3 className="text-lg font-bold mb-2">Cancel Booking</h3>
-              <p className="text-sm text-gray-600 mb-4">Are you sure you want to cancel this booking?</p>
+              <p className="text-sm text-gray-600 mb-3">Are you sure you want to cancel this booking?</p>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={3}
+                placeholder="Reason for cancellation"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4"
+              />
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setPendingCancelId(null)}
+                  onClick={() => {
+                    setPendingCancelId(null);
+                    setCancelReason('');
+                  }}
                   className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-800"
                 >
                   Keep
@@ -501,7 +517,7 @@ export default function StudentDashboard({ user, userName }) {
           </section>
         )}
 
-        {activeSection === 'account' && (
+        {requirePasswordChange && activeSection === 'account' && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold mb-4">Account</h2>
             <div className="bg-white rounded-lg shadow-lg p-6">
