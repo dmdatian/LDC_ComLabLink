@@ -1709,6 +1709,110 @@ export default function AdminDashboard({ user, userName }) {
       .slice(0, 5);
   })();
 
+  const roleUserSummary = (() => {
+    const studentSet = new Set();
+    const teacherSet = new Set();
+
+    detailBookings.forEach(({ bookings }) => {
+      bookings.forEach((booking) => {
+        const role = String(booking.role || '').toLowerCase();
+        if (role === 'student' || role === '') {
+          if (booking.studentName) studentSet.add(booking.studentName);
+          else if (booking.studentId) studentSet.add(booking.studentId);
+        }
+        if (role === 'teacher') {
+          if (booking.teacherName) teacherSet.add(booking.teacherName);
+          else if (booking.teacherId) teacherSet.add(booking.teacherId);
+        }
+      });
+    });
+
+    const studentCount = studentSet.size;
+    const teacherCount = teacherSet.size;
+    const otherCount = Math.max(0, (studentCount + teacherCount) ? 0 : 0);
+
+    return [
+      { label: 'Students', value: studentCount, color: '#2563eb' },
+      { label: 'Teachers', value: teacherCount, color: '#f59e0b' },
+      ...(otherCount > 0 ? [{ label: 'Others', value: otherCount, color: '#10b981' }] : []),
+    ];
+  })();
+
+  const gradeLevelSummary = (() => {
+    const map = {};
+    detailBookings.forEach(({ bookings }) => {
+      bookings.forEach((booking) => {
+        const role = String(booking.role || '').toLowerCase();
+        if (role && role !== 'student') return;
+
+        const grade = String(booking.gradeLevel || booking.gradeLevelId || '').trim();
+        if (!grade) return;
+        map[grade] = (map[grade] || 0) + 1;
+      });
+    });
+
+    return Object.entries(map)
+      .map(([label, value], idx) => ({
+        label,
+        value,
+        color: ['#6366f1', '#f97316', '#22c55e', '#ec4899', '#14b8a6'][idx % 5],
+      }));
+  })();
+
+  const PieChart = ({ title, data }) => {
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    if (total === 0) {
+      return (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h3 className="text-xl font-bold mb-4">{title}</h3>
+          <p className="text-gray-600">No data available for pie chart.</p>
+        </div>
+      );
+    }
+
+    let currentDegree = 0;
+    const gradientStops = data
+      .map((item, idx) => {
+        const start = currentDegree;
+        const portion = (item.value / total) * 360;
+        currentDegree += portion;
+        return `${item.color} ${start}deg ${currentDegree}deg`;
+      })
+      .join(', ');
+
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h3 className="text-xl font-bold mb-4">{title}</h3>
+        <div className="flex items-center gap-6">
+          <div
+            style={{
+              width: 180,
+              height: 180,
+              borderRadius: '50%',
+              background: `conic-gradient(${gradientStops})`,
+            }}
+          />
+          <div className="space-y-2">
+            {data.map((item) => {
+              const percent = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0';
+              return (
+                <div key={item.label} className="flex items-center gap-2">
+                  <span
+                    className="w-3 h-3 rounded"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="text-sm text-gray-700">
+                    {item.label}: {item.value} ({percent}%)
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const feedbackSummary = (() => {
     const summary = {
       total: detailFeedback.length,
@@ -2047,6 +2151,30 @@ export default function AdminDashboard({ user, userName }) {
       }
     }
 
+    if (peakHours.length > 0) {
+      addTitle('Peak Booking Hours');
+      addTable(
+        ['Hour', 'Bookings'],
+        peakHours.map((item) => [formatHourLabel12h(item.hour), item.value])
+      );
+    }
+
+    if (roleUserSummary.length > 0) {
+      addTitle('Users By Role');
+      addTable(
+        ['Role', 'Unique Users'],
+        roleUserSummary.map((item) => [item.label, item.value])
+      );
+    }
+
+    if (gradeLevelSummary.length > 0) {
+      addTitle('Students Per Grade Level');
+      addTable(
+        ['Grade Level', 'Count'],
+        gradeLevelSummary.map((item) => [item.label, item.value])
+      );
+    }
+
     addTitle('Top Activity');
     addTable(
       ['Top Students', 'Bookings', 'Top Teachers', 'Classes'],
@@ -2160,18 +2288,58 @@ export default function AdminDashboard({ user, userName }) {
 
         <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
           <h3 className="text-xl font-bold mb-4">Attendance Rate (%)</h3>
-          <div className="flex items-end gap-2 h-40">
-            {attendanceSeries.map((item) => (
-              <div key={item.date} className="flex flex-col items-center flex-1 min-w-[24px]">
-                <div
-                  className="w-full bg-green-500 rounded"
-                  style={{ height: `${(item.value / maxAttendance) * 100}%` }}
-                />
-                <span className="text-[10px] text-gray-500 mt-2">{item.date.slice(5)}</span>
-                <span className="text-[10px] text-gray-400">{item.value}%</span>
-              </div>
-            ))}
+          <div className="w-full overflow-x-auto">
+            <svg viewBox="0 0 1000 220" className="w-full min-w-[700px] h-56">
+              <rect x="0" y="0" width="1000" height="220" fill="#f8fafc" />
+              <line x1="40" y1="20" x2="40" y2="180" stroke="#e2e8f0" strokeWidth="1" />
+              <line x1="40" y1="180" x2="960" y2="180" stroke="#e2e8f0" strokeWidth="1" />
+
+              {Array.from({ length: 5 }).map((_, idx) => {
+                const value = Math.round((maxAttendance * (5 - idx)) / 5);
+                const y = 20 + ((5 - idx) * 32);
+                return (
+                  <g key={`att-tick-${idx}`}>
+                    <line x1="40" y1={y} x2="960" y2={y} stroke="#e2e8f0" strokeDasharray="4 2" />
+                    <text x="8" y={y + 4} fontSize="10" fill="#64748b">{value}%</text>
+                  </g>
+                );
+              })}
+
+              <polyline
+                fill="none"
+                stroke="#16a34a"
+                strokeWidth="3"
+                points={attendanceSeries
+                  .map((item, idx) => {
+                    const x = 40 + (idx * (920 / Math.max(attendanceSeries.length - 1, 1)));
+                    const y = 180 - ((item.value / Math.max(maxAttendance, 1)) * 160);
+                    return `${x},${y}`;
+                  })
+                  .join(' ')}
+              />
+
+              {attendanceSeries.map((item, idx) => {
+                const x = 40 + (idx * (920 / Math.max(attendanceSeries.length - 1, 1)));
+                const y = 180 - ((item.value / Math.max(maxAttendance, 1)) * 160);
+                return (
+                  <g key={item.date}>
+                    <circle cx={x} cy={y} r="4" fill="#16a34a" />
+                    <text x={x - 14} y={y - 8} fontSize="10" fill="#065f46">{item.value}%</text>
+                  </g>
+                );
+              })}
+
+              {attendanceSeries.map((item, idx) => {
+                const x = 40 + (idx * (920 / Math.max(attendanceSeries.length - 1, 1)));
+                return (
+                  <text key={`x-${item.date}`} x={x - 18} y="198" fontSize="9" fill="#475569">
+                    {item.date.slice(5)}
+                  </text>
+                );
+              })}
+            </svg>
           </div>
+          <p className="text-xs text-gray-500 mt-2">Attendance rate line graph</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
@@ -2288,6 +2456,11 @@ export default function AdminDashboard({ user, userName }) {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+          <PieChart title="Users by Role" data={roleUserSummary} />
+          <PieChart title="Students per Grade Level" data={gradeLevelSummary} />
         </div>
 
         <FeedbackSummaryPanel />
