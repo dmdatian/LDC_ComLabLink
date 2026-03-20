@@ -1185,6 +1185,7 @@ export default function AdminDashboard({ user, userName }) {
 
   useEffect(() => {
     if (activeSection !== 'reports') return;
+    if (reportTab === 'yearly') return; // Skip detailed fetch for yearly reports
     fetchDetailedReportData();
   }, [activeSection, reportTab, weeklyRange, monthlyConfig, yearlyYear, feedbackEntries]);
 
