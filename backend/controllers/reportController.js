@@ -2,6 +2,19 @@ const Booking = require('../models/Booking');
 const Class = require('../models/Class');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
+const buildBookingSummary = (bookings = []) => {
+  const normalized = bookings.map((booking) => String(booking?.status || 'pending').toLowerCase());
+
+  return {
+    totalBookings: bookings.length,
+    approvedBookings: normalized.filter((status) => ['approved', 'attended'].includes(status)).length,
+    upcomingBookings: normalized.filter((status) => ['pending', 'approved'].includes(status)).length,
+    attendedBookings: normalized.filter((status) => status === 'attended').length,
+    cancelledBookings: normalized.filter((status) => status === 'cancelled').length,
+    missedBookings: normalized.filter((status) => status === 'missed').length,
+  };
+};
+
 exports.getDailyReport = async (req, res) => {
   try {
     if (!['admin', 'teacher'].includes(req.user.role)) {
@@ -14,16 +27,12 @@ exports.getDailyReport = async (req, res) => {
     const bookings = await Booking.getByDate(date);
     const classes = await Class.getByDate(date);
 
-    const totalBookings = bookings.length;
-    const approvedBookings = bookings.filter(b => ['approved','attended'].includes(b.status)).length;
-    const attendedBookings = bookings.filter(b => b.status === 'attended').length;
+    const summary = buildBookingSummary(bookings);
 
     sendSuccess(res, 200, {
       date,
       totalClasses: classes.length,
-      totalBookings,
-      approvedBookings,
-      attendedBookings,
+      ...summary,
       bookings,
       classes
     }, 'Daily report generated');
@@ -53,9 +62,7 @@ exports.getWeeklyReport = async (req, res) => {
     sendSuccess(res, 200, {
       startDate,
       endDate,
-      totalBookings: bookings.length,
-      approvedBookings: bookings.filter(b => ['approved','attended'].includes(b.status)).length,
-      attendedBookings: bookings.filter(b => b.status === 'attended').length,
+      ...buildBookingSummary(bookings),
       bookings
     }, 'Weekly report generated');
   } catch (error) {
@@ -86,9 +93,7 @@ exports.getMonthlyReport = async (req, res) => {
     sendSuccess(res, 200, {
       month,
       year,
-      totalBookings: bookings.length,
-      approvedBookings: bookings.filter(b => ['approved','attended'].includes(b.status)).length,
-      attendedBookings: bookings.filter(b => b.status === 'attended').length,
+      ...buildBookingSummary(bookings),
       bookings
     }, 'Monthly report generated');
   } catch (error) {

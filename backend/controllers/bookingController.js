@@ -1001,15 +1001,14 @@ exports.markAttendance = async (req, res) => {
   }
 };
 
-// SEAT BOOKING: self confirm attendance (student/teacher)
+// SEAT BOOKING: confirm attendance (admin only)
 exports.confirmAttendance = async (req, res) => {
   try {
     const booking = await Booking.getById(req.params.id);
     if (!booking) return sendError(res, 404, 'Booking not found');
 
-    const isOwner = String(booking.studentId || '').trim() === String(req.user.uid || '').trim();
     const isAdmin = String(req.user.role || '').toLowerCase() === 'admin';
-    if (!isOwner && !isAdmin) return sendError(res, 403, 'Unauthorized');
+    if (!isAdmin) return sendError(res, 403, 'Only admins can confirm attendance');
 
     const status = String(booking.status || '').toLowerCase();
     if (['cancelled', 'rejected', 'missed', 'absent'].includes(status)) {

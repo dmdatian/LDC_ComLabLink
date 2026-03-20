@@ -30,6 +30,8 @@ const FIXED_SCHEDULE_DAYS = [
   { dayOfWeek: 5, label: 'Friday' },
 ];
 
+const REPORT_STATUS_KEYS = ['attended', 'cancelled', 'missed'];
+
 export default function AdminDashboard({ user, userName }) {
   // STATE: bookings/reports/users/feedback
   const navigate = useNavigate();
@@ -218,7 +220,6 @@ export default function AdminDashboard({ user, userName }) {
       const isToday = date === toLocalDateKey(now);
       setAttendanceRows(
         rows
-          .filter((row) => String(row?.status || '').trim().toLowerCase() !== 'cancelled')
           .sort((a, b) => {
             const aStart = toDashboardDate(a?.startTime || a?.start, a?.date);
             const bStart = toDashboardDate(b?.startTime || b?.start, b?.date);
@@ -1148,11 +1149,12 @@ export default function AdminDashboard({ user, userName }) {
         (acc, response) => {
           const data = response.data.data;
           acc.totalBookings += data.totalBookings;
-          acc.approvedBookings += data.approvedBookings;
+          acc.upcomingBookings += data.upcomingBookings || 0;
           acc.attendedBookings += data.attendedBookings;
+          acc.cancelledBookings += data.cancelledBookings || 0;
           return acc;
         },
-        { totalBookings: 0, approvedBookings: 0, attendedBookings: 0 }
+        { totalBookings: 0, upcomingBookings: 0, attendedBookings: 0, cancelledBookings: 0 }
       );
 
       setYearlyReport({
@@ -1203,8 +1205,9 @@ export default function AdminDashboard({ user, userName }) {
 
     const metrics = [
       { label: 'Total Bookings', value: data.totalBookings, color: 'bg-blue-500' },
-      { label: 'Approved', value: data.approvedBookings, color: 'bg-green-500' },
-      { label: 'Attended', value: data.attendedBookings, color: 'bg-purple-500' },
+      { label: 'Upcoming', value: data.upcomingBookings || 0, color: 'bg-amber-500' },
+      { label: 'Attended', value: data.attendedBookings, color: 'bg-green-500' },
+      { label: 'Cancelled', value: data.cancelledBookings || 0, color: 'bg-red-400' },
     ];
     const maxValue = Math.max(...metrics.map((m) => m.value), 1);
 
@@ -1534,19 +1537,15 @@ export default function AdminDashboard({ user, userName }) {
   const buildBookingStatusSeries = () => {
     const series = detailBookings.map(({ date, bookings }) => {
       const counts = {
-        pending: 0,
-        approved: 0,
         attended: 0,
         cancelled: 0,
-        rejected: 0,
+        missed: 0,
       };
 
       bookings.forEach((booking) => {
         const status = (booking.status || 'pending').toLowerCase();
         if (counts[status] !== undefined) {
           counts[status] += 1;
-        } else {
-          counts.pending += 1;
         }
       });
 
@@ -1559,7 +1558,7 @@ export default function AdminDashboard({ user, userName }) {
   const bookingStatusSeries = buildBookingStatusSeries();
 
   const attendanceSeries = bookingStatusSeries.map((entry) => {
-    const denom = entry.approved + entry.attended;
+    const denom = entry.attended + entry.missed;
     const rate = denom > 0 ? Math.round((entry.attended / denom) * 100) : 0;
     return { date: entry.date, value: rate };
   });
@@ -1753,11 +1752,9 @@ export default function AdminDashboard({ user, userName }) {
       : `${feedbackSummary.avgScore}% (positive to negative scale)`;
 
   const statusColors = {
-    pending: 'bg-yellow-400',
-    approved: 'bg-blue-500',
     attended: 'bg-green-500',
     cancelled: 'bg-red-400',
-    rejected: 'bg-gray-500',
+    missed: 'bg-amber-500',
   };
 
   const FeedbackSummaryPanel = () => (
@@ -1986,8 +1983,9 @@ export default function AdminDashboard({ user, userName }) {
       ['Metric', 'Value'],
       [
         ['Total Bookings', activeReportData.totalBookings ?? 0],
-        ['Approved Bookings', activeReportData.approvedBookings ?? 0],
+        ['Upcoming Bookings', activeReportData.upcomingBookings ?? 0],
         ['Attended Bookings', activeReportData.attendedBookings ?? 0],
+        ['Cancelled Bookings', activeReportData.cancelledBookings ?? 0],
         ['Most Used Seat', `${reportInsights.mostUsedSeat.label} (${reportInsights.mostUsedSeat.count})`],
         ['Top Grade Level', `${reportInsights.topGradeLevel.label} (${reportInsights.topGradeLevel.count})`],
         ['Top Section', `${reportInsights.topSection.label} (${reportInsights.topSection.count})`],
@@ -2000,33 +1998,27 @@ export default function AdminDashboard({ user, userName }) {
       if (isSummaryGraphMode) {
         const statusTotals = bookingStatusSeries.reduce(
           (acc, entry) => ({
-            pending: acc.pending + (entry.pending || 0),
-            approved: acc.approved + (entry.approved || 0),
             attended: acc.attended + (entry.attended || 0),
             cancelled: acc.cancelled + (entry.cancelled || 0),
-            rejected: acc.rejected + (entry.rejected || 0),
+            missed: acc.missed + (entry.missed || 0),
           }),
-          { pending: 0, approved: 0, attended: 0, cancelled: 0, rejected: 0 }
+          { attended: 0, cancelled: 0, missed: 0 }
         );
 
         addSummaryBarChart('Bookings by Status (Summary Graph)', [
-          { label: 'Pending', value: statusTotals.pending },
-          { label: 'Approved', value: statusTotals.approved },
           { label: 'Attended', value: statusTotals.attended },
           { label: 'Cancelled', value: statusTotals.cancelled },
-          { label: 'Rejected', value: statusTotals.rejected },
+          { label: 'Missed', value: statusTotals.missed },
         ]);
       } else {
         addTitle('Bookings by Status (Daily)');
         addTable(
-          ['Date', 'Pending', 'Approved', 'Attended', 'Cancelled', 'Rejected'],
+          ['Date', 'Attended', 'Cancelled', 'Missed'],
           bookingStatusSeries.slice(0, 30).map((entry) => [
             entry.date,
-            entry.pending,
-            entry.approved,
             entry.attended,
             entry.cancelled,
-            entry.rejected,
+            entry.missed,
           ])
         );
       }
@@ -2109,7 +2101,7 @@ export default function AdminDashboard({ user, userName }) {
 
     const maxDailyTotal = Math.max(
       ...bookingStatusSeries.map((entry) =>
-        entry.pending + entry.approved + entry.attended + entry.cancelled + entry.rejected
+        entry.attended + entry.cancelled + entry.missed
       ),
       1
     );
@@ -2132,7 +2124,7 @@ export default function AdminDashboard({ user, userName }) {
         <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
           <h3 className="text-xl font-bold mb-4">Bookings by Status Over Time</h3>
           <div className="flex flex-wrap gap-4 text-xs text-gray-600 mb-4">
-            {Object.keys(statusColors).map((status) => (
+            {REPORT_STATUS_KEYS.map((status) => (
               <div key={status} className="flex items-center gap-2">
                 <span className={`w-3 h-3 rounded ${statusColors[status]}`} />
                 <span className="capitalize">{status}</span>
@@ -2141,12 +2133,12 @@ export default function AdminDashboard({ user, userName }) {
           </div>
           <div className="flex items-end gap-2 h-48">
             {bookingStatusSeries.map((entry) => {
-              const total = entry.pending + entry.approved + entry.attended + entry.cancelled + entry.rejected;
+              const total = REPORT_STATUS_KEYS.reduce((sum, status) => sum + (entry[status] || 0), 0);
               const heightPercent = (total / maxDailyTotal) * 100;
               return (
                 <div key={entry.date} className="flex flex-col items-center flex-1 min-w-[24px]">
                   <div className="w-full h-40 bg-slate-100 rounded overflow-hidden flex flex-col justify-end">
-                    {Object.keys(statusColors).map((status) => {
+                    {REPORT_STATUS_KEYS.map((status) => {
                       const value = entry[status];
                       if (!value) return null;
                       const segment = total > 0 ? (value / total) * heightPercent : 0;
@@ -2398,11 +2390,12 @@ export default function AdminDashboard({ user, userName }) {
         {activeSection === 'home' && (
           <>
             {report && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 {[ 
                   ['Total Bookings', report.totalBookings, 'green'],
-                  ['Approved', report.approvedBookings, 'yellow'],
+                  ['Upcoming', report.upcomingBookings || 0, 'yellow'],
                   ['Attendance', report.attendedBookings, 'purple'],
+                  ['Cancelled', report.cancelledBookings || 0, 'red'],
                 ].map(([label, value, color]) => (
                   <div
                     key={label}
@@ -2472,12 +2465,18 @@ export default function AdminDashboard({ user, userName }) {
                   {attendanceRows.map((row) => {
                     const bookingId = row.bookingId || row.id;
                     const normalizedStatus = String(row.status || '').trim().toLowerCase();
-                    const isTerminalStatus = normalizedStatus === 'attended' || normalizedStatus === 'missed';
+                    const isTerminalStatus = normalizedStatus === 'attended' || normalizedStatus === 'missed' || normalizedStatus === 'cancelled';
                     const isUpdating = attendanceUpdatingId && String(attendanceUpdatingId) === String(bookingId);
                     const canUpdateAttendance = canAdminUpdateAttendance(row);
                     const startLabel = formatClockTime(row.startClock || row.startTime, row.date);
                     const endLabel = formatClockTime(row.endClock || row.endTime, row.date);
-                    const statusLabel = normalizedStatus === 'attended' ? 'Confirmed' : normalizedStatus === 'missed' ? 'Missed' : (row.status || 'expected');
+                    const statusLabel = normalizedStatus === 'attended'
+                      ? 'Confirmed'
+                      : normalizedStatus === 'missed'
+                        ? 'Missed'
+                        : normalizedStatus === 'cancelled'
+                          ? 'Cancelled'
+                          : (row.status || 'expected');
                     return (
                       <div
                         key={bookingId}
@@ -2494,6 +2493,9 @@ export default function AdminDashboard({ user, userName }) {
                             {endLabel}
                           </p>
                           <p className="text-xs text-gray-500 capitalize">Status: {statusLabel}</p>
+                          {normalizedStatus === 'cancelled' && row.cancelReason && (
+                            <p className="text-xs text-red-600 mt-1">Reason: {row.cancelReason}</p>
+                          )}
                           <p className="text-xs text-gray-500 capitalize">User: {row.role || 'student'}</p>
                           {!isTerminalStatus && !canUpdateAttendance && (
                             <p className="text-xs text-amber-700 mt-1">
@@ -2507,10 +2509,12 @@ export default function AdminDashboard({ user, userName }) {
                             className={`px-3 py-1 rounded text-sm font-semibold ${
                               normalizedStatus === 'attended'
                                 ? 'bg-green-100 text-green-700'
-                                : 'bg-red-100 text-red-700'
+                                : normalizedStatus === 'cancelled'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-amber-100 text-amber-700'
                             }`}
                           >
-                            {normalizedStatus === 'attended' ? 'Confirmed' : 'Missed'}
+                            {normalizedStatus === 'attended' ? 'Confirmed' : normalizedStatus === 'cancelled' ? 'Cancelled' : 'Missed'}
                           </span>
                         ) : (
                           <div className="flex gap-2">
@@ -2562,7 +2566,7 @@ export default function AdminDashboard({ user, userName }) {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100">
                       <tr>
-                        {['Name', 'Role', 'Grade Level', 'Section', 'Start Time', 'End Time', 'Seat', 'Subject', 'Purpose', 'Status'].map((h) => (
+                        {['Name', 'Role', 'Grade Level', 'Section', 'Start Time', 'End Time', 'Seat', 'Subject', 'Purpose', 'Status', 'Cancel Reason'].map((h) => (
                           <th key={h} className="px-3 py-2 text-left whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -2589,6 +2593,7 @@ export default function AdminDashboard({ user, userName }) {
                             <td className="px-3 py-2 whitespace-nowrap">{b.subject || '-'}</td>
                             <td className="px-3 py-2 whitespace-nowrap">{b.purpose || '-'}</td>
                             <td className="px-3 py-2 whitespace-nowrap capitalize">{String(b.status || '-')}</td>
+                            <td className="px-3 py-2">{b.cancelReason || '-'}</td>
                           </tr>
                         );
                       })}

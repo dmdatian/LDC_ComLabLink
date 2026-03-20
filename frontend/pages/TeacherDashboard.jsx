@@ -201,34 +201,6 @@ export default function TeacherDashboard({ user, userName }) {
     return parsed ? parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
   };
 
-  const getAttendanceDeadline = (booking) => {
-    const start = toDate(booking?.startTime);
-    if (!start) return null;
-    const stored = toDate(booking?.attendanceDeadlineAt);
-    if (stored) return stored;
-    return new Date(start.getTime() + 15 * 60 * 1000);
-  };
-
-  const canConfirmAttendance = (booking) => {
-    const status = String(booking?.status || '').toLowerCase();
-    if (status !== 'approved') return false;
-    const now = new Date();
-    const start = toDate(booking?.startTime);
-    const deadline = getAttendanceDeadline(booking);
-    if (!start || !deadline) return false;
-    return now >= start && now <= deadline;
-  };
-
-  const handleConfirmAttendance = async (bookingId) => {
-    try {
-      await seatsAPI.confirmAttendance(bookingId);
-      await fetchBookings();
-      await fetchNotifications();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to confirm attendance');
-    }
-  };
-
   const handleFeedbackSubmit = (e) => {
     e.preventDefault();
     if (!feedbackMessage.trim()) {
@@ -402,9 +374,6 @@ export default function TeacherDashboard({ user, userName }) {
                         : [];
                     const status = String(booking.status || 'pending').toLowerCase();
                     const canCancel = !TERMINAL_BOOKING_STATUSES.has(status);
-                    const canConfirm = String(booking.studentId || '').trim() === String(user?.uid || '').trim()
-                      && canConfirmAttendance(booking);
-
                     return (
                       <div key={booking.id} className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div>
@@ -425,15 +394,6 @@ export default function TeacherDashboard({ user, userName }) {
                         </div>
 
                         <div className="flex gap-2">
-                          {canConfirm && (
-                            <button
-                              type="button"
-                              onClick={() => handleConfirmAttendance(booking.id)}
-                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition"
-                            >
-                              Confirm Attendance
-                            </button>
-                          )}
                           {canCancel && (
                             <button
                               type="button"

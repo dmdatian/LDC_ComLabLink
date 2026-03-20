@@ -33,6 +33,6 @@ router.get('/', roleMiddleware(['admin']), bookingController.getAllBookings);
 router.get('/:id', bookingController.getBookingById);
 router.patch('/:id/cancel', bookingController.cancelBooking); // more semantic
 router.patch('/:id/attendance', roleMiddleware(['admin']), markAttendanceHandler);
-router.patch('/:id/confirm-attendance', confirmAttendanceHandler);
+router.patch('/:id/confirm-attendance', roleMiddleware(['admin']), confirmAttendanceHandler);
 
 module.exports = router;
