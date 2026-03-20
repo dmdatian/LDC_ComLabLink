@@ -3,12 +3,12 @@ const Class = require('../models/Class');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 
 const buildBookingSummary = (bookings = []) => {
-  const normalized = bookings.map((booking) => String(booking?.status || 'pending').toLowerCase());
+  const normalized = bookings.map((booking) => String(booking?.status || 'approved').toLowerCase());
 
   return {
     totalBookings: bookings.length,
     approvedBookings: normalized.filter((status) => ['approved', 'attended'].includes(status)).length,
-    upcomingBookings: normalized.filter((status) => ['pending', 'approved'].includes(status)).length,
+    upcomingBookings: normalized.filter((status) => ['approved'].includes(status)).length,
     attendedBookings: normalized.filter((status) => status === 'attended').length,
     cancelledBookings: normalized.filter((status) => status === 'cancelled').length,
     missedBookings: normalized.filter((status) => status === 'missed').length,

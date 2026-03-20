@@ -372,7 +372,7 @@ export default function TeacherDashboard({ user, userName }) {
                       : booking.seat
                         ? [booking.seat]
                         : [];
-                    const status = String(booking.status || 'pending').toLowerCase();
+                    const status = String(booking.status || 'approved').toLowerCase();
                     const canCancel = !TERMINAL_BOOKING_STATUSES.has(status);
                     return (
                       <div key={booking.id} className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">

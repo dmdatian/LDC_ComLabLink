@@ -85,7 +85,7 @@ const BOOKING_END_TIME_OPTIONS = [
   { value: '16:00', label: '4:00 PM' },
 ];
 
-const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'approved']);
+const ACTIVE_BOOKING_STATUSES = new Set(['approved']);
 const isActiveBookingStatus = (status) => ACTIVE_BOOKING_STATUSES.has(String(status || '').toLowerCase());
 const isWeekendDate = (dateKey) => {
   const match = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);

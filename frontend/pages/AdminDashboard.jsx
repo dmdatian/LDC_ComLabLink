@@ -1306,8 +1306,8 @@ export default function AdminDashboard({ user, userName }) {
     const parsed = toDateObject(value, fallbackDate);
     if (!parsed) return invalidLabel;
 
-    const h = parsed.getUTCHours();
-    const m = parsed.getUTCMinutes();
+    const h = parsed.getHours();
+    const m = parsed.getMinutes();
     const hour12 = ((h + 11) % 12) + 1;
     const suffix = h >= 12 ? 'PM' : 'AM';
     return `${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
@@ -1543,7 +1543,7 @@ export default function AdminDashboard({ user, userName }) {
       };
 
       bookings.forEach((booking) => {
-        const status = (booking.status || 'pending').toLowerCase();
+        const status = (booking.status || 'approved').toLowerCase();
         if (counts[status] !== undefined) {
           counts[status] += 1;
         }
@@ -1582,7 +1582,7 @@ export default function AdminDashboard({ user, userName }) {
 
     const parsed = toDateObject(raw, booking?.date);
     if (!parsed) return null;
-    return parsed.getUTCHours();
+    return parsed.getHours();
   }
 
   const hourlyBookingSeries = (() => {

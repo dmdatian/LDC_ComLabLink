@@ -28,7 +28,7 @@ class Booking {
         gradeLevel: bookingData.gradeLevel || null,
         sectionId: bookingData.sectionId || null,
         section: bookingData.section || null,
-        status: bookingData.status || 'pending', // pending, approved, rejected, attended, missed
+        status: bookingData.status || 'approved', // pending (deprecated), approved, rejected, attended, missed
         attendanceDeadlineAt: bookingData.attendanceDeadlineAt ? new Date(bookingData.attendanceDeadlineAt) : null,
         attendanceConfirmedAt: bookingData.attendanceConfirmedAt ? new Date(bookingData.attendanceConfirmedAt) : null,
         attendanceReminderNotifiedAt: bookingData.attendanceReminderNotifiedAt ? new Date(bookingData.attendanceReminderNotifiedAt) : null,
@@ -98,7 +98,7 @@ class Booking {
     try {
       const snapshot = await db.collection(COLLECTION)
         .where('date', '==', date)
-        .where('status', 'in', ['approved', 'pending'])
+        .where('status', '==', 'approved')
         .get();
 
       const conflicts = snapshot.docs.filter(doc => {

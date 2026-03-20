@@ -18,7 +18,8 @@ const {
 
 const MAX_BOOKINGS_PER_WEEK_PER_USER = 2;
 const ATTENDANCE_CONFIRMATION_WINDOW_MINUTES = 15;
-const ACTIVE_BOOKING_STATUSES = new Set(['pending', 'approved']);
+// Pending booking workflow is no longer used. All new bookings are approved if valid.
+const ACTIVE_BOOKING_STATUSES = new Set(['approved']);
 
 const isActiveBookingStatus = (status) => ACTIVE_BOOKING_STATUSES.has(String(status || '').toLowerCase());
 const isWeekendDateKey = (dateKey) => {
