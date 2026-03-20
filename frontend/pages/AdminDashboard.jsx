@@ -1203,6 +1203,41 @@ export default function AdminDashboard({ user, userName }) {
       );
     }
 
+    // Handle yearly report (array of monthly data)
+    if (Array.isArray(data)) {
+      return (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h3 className="text-xl font-bold mb-6">Yearly Report Summary (Jan-Dec)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {data.map((monthData) => (
+              <div key={monthData.month} className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                <h4 className="text-lg font-semibold text-slate-800 mb-3">{monthData.monthName}</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-slate-600">Total:</span>
+                    <span className="font-semibold">{monthData.totalBookings || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-slate-600">Upcoming:</span>
+                    <span className="font-semibold">{monthData.upcomingBookings || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-slate-600">Attended:</span>
+                    <span className="font-semibold">{monthData.attendedBookings || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-slate-600">Cancelled:</span>
+                    <span className="font-semibold">{monthData.cancelledBookings || 0}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // Handle weekly/monthly reports (object with totals)
     const metrics = [
       { label: 'Total Bookings', value: data.totalBookings, color: 'bg-blue-500' },
       { label: 'Upcoming', value: data.upcomingBookings || 0, color: 'bg-amber-500' },
