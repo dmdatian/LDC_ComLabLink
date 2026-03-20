@@ -72,9 +72,6 @@ export default function AdminDashboard({ user, userName }) {
   const [selectedDate, setSelectedDate] = useState(toLocalDateKey());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [pendingUsers, setPendingUsers] = useState([]);
-  const [pendingLoading, setPendingLoading] = useState(false);
-  const [pendingError, setPendingError] = useState('');
   const [accountUsers, setAccountUsers] = useState([]);
   const [inactiveAccountUsers, setInactiveAccountUsers] = useState([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
@@ -158,7 +155,6 @@ export default function AdminDashboard({ user, userName }) {
   useEffect(() => {
     fetchDailyData();
     fetchAttendance(selectedDate);
-    fetchPendingUsers();
     refreshFeedback();
     fetchSectionData();
   }, []);
@@ -278,19 +274,6 @@ export default function AdminDashboard({ user, userName }) {
   };
 
   // USERS: pending approvals
-  const fetchPendingUsers = async () => {
-    setPendingLoading(true);
-    setPendingError('');
-    try {
-      const response = await authAPI.getPendingUsers();
-      setPendingUsers(response.data.data || []);
-    } catch (err) {
-      setPendingError(err.response?.data?.message || 'Failed to load pending users');
-    } finally {
-      setPendingLoading(false);
-    }
-  };
-
   const fetchAccountsData = async () => {
     setAccountsLoading(true);
     setAccountsError('');
@@ -1141,26 +1124,37 @@ export default function AdminDashboard({ user, userName }) {
     setReportError('');
     try {
       const months = Array.from({ length: 12 }, (_, idx) => idx + 1);
-      const responses = await Promise.all(
-        months.map((month) => reportAPI.getMonthlyReport(month, yearlyYear))
+      const monthlyReports = await Promise.all(
+        months.map(async (month) => {
+          try {
+            const response = await reportAPI.getMonthlyReport(month, yearlyYear);
+            const data = response.data.data || {};
+            return {
+              month,
+              monthName: new Date(yearlyYear, month - 1, 1).toLocaleString('default', {
+                month: 'long',
+              }),
+              totalBookings: data.totalBookings || 0,
+              upcomingBookings: data.upcomingBookings || 0,
+              attendedBookings: data.attendedBookings || 0,
+              cancelledBookings: data.cancelledBookings || 0,
+            };
+          } catch (err) {
+            return {
+              month,
+              monthName: new Date(yearlyYear, month - 1, 1).toLocaleString('default', {
+                month: 'long',
+              }),
+              totalBookings: 0,
+              upcomingBookings: 0,
+              attendedBookings: 0,
+              cancelledBookings: 0,
+            };
+          }
+        })
       );
 
-      const totals = responses.reduce(
-        (acc, response) => {
-          const data = response.data.data;
-          acc.totalBookings += data.totalBookings;
-          acc.upcomingBookings += data.upcomingBookings || 0;
-          acc.attendedBookings += data.attendedBookings;
-          acc.cancelledBookings += data.cancelledBookings || 0;
-          return acc;
-        },
-        { totalBookings: 0, upcomingBookings: 0, attendedBookings: 0, cancelledBookings: 0 }
-      );
-
-      setYearlyReport({
-        year: yearlyYear,
-        ...totals,
-      });
+      setYearlyReport(monthlyReports);
     } catch (err) {
       setReportError(err.response?.data?.message || 'Failed to generate yearly report');
     } finally {
@@ -1513,6 +1507,15 @@ export default function AdminDashboard({ user, userName }) {
   };
 
   const fetchDetailedReportData = async () => {
+    if (reportTab === 'yearly') {
+      // For yearly reports, do not run daily detail queries.
+      setDetailError('');
+      setDetailBookings([]);
+      setDetailClasses([]);
+      setDetailFeedback([]);
+      return;
+    }
+
     const { startDate, endDate } = getDateRangeForTab();
     if (!startDate || !endDate) return;
 
@@ -2117,19 +2120,50 @@ export default function AdminDashboard({ user, userName }) {
     addParagraph(`Period: ${periodLabel}`);
     addParagraph(`Generated: ${new Date().toLocaleString()}`);
 
+    const yearlyTotals = Array.isArray(activeReportData)
+      ? activeReportData.reduce(
+          (acc, month) => ({
+            totalBookings: acc.totalBookings + (month.totalBookings || 0),
+            upcomingBookings: acc.upcomingBookings + (month.upcomingBookings || 0),
+            attendedBookings: acc.attendedBookings + (month.attendedBookings || 0),
+            cancelledBookings: acc.cancelledBookings + (month.cancelledBookings || 0),
+          }),
+          { totalBookings: 0, upcomingBookings: 0, attendedBookings: 0, cancelledBookings: 0 }
+        )
+      : {
+          totalBookings: activeReportData.totalBookings || 0,
+          upcomingBookings: activeReportData.upcomingBookings || 0,
+          attendedBookings: activeReportData.attendedBookings || 0,
+          cancelledBookings: activeReportData.cancelledBookings || 0,
+        };
+
     addTitle('Summary');
     addTable(
       ['Metric', 'Value'],
       [
-        ['Total Bookings', activeReportData.totalBookings ?? 0],
-        ['Upcoming Bookings', activeReportData.upcomingBookings ?? 0],
-        ['Attended Bookings', activeReportData.attendedBookings ?? 0],
-        ['Cancelled Bookings', activeReportData.cancelledBookings ?? 0],
+        ['Total Bookings', yearlyTotals.totalBookings],
+        ['Upcoming Bookings', yearlyTotals.upcomingBookings],
+        ['Attended Bookings', yearlyTotals.attendedBookings],
+        ['Cancelled Bookings', yearlyTotals.cancelledBookings],
         ['Most Used Seat', `${reportInsights.mostUsedSeat.label} (${reportInsights.mostUsedSeat.count})`],
         ['Top Grade Level', `${reportInsights.topGradeLevel.label} (${reportInsights.topGradeLevel.count})`],
         ['Top Section', `${reportInsights.topSection.label} (${reportInsights.topSection.count})`],
       ]
     );
+
+    if (Array.isArray(activeReportData) && activeReportData.length > 0) {
+      addTitle('Yearly Monthly Breakdown (Jan-Dec)');
+      addTable(
+        ['Month', 'Total', 'Upcoming', 'Attended', 'Cancelled'],
+        activeReportData.map((monthData) => [
+          monthData.monthName || `Month ${monthData.month}`,
+          monthData.totalBookings || 0,
+          monthData.upcomingBookings || 0,
+          monthData.attendedBookings || 0,
+          monthData.cancelledBookings || 0,
+        ])
+      );
+    }
 
     const isSummaryGraphMode = reportTab === 'monthly' || reportTab === 'yearly';
 
@@ -2616,47 +2650,6 @@ export default function AdminDashboard({ user, userName }) {
               </div>
             )}
 
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-2xl font-bold mb-4">Pending Approvals</h2>
-
-              {pendingLoading && <p className="text-gray-500">Loadingâ€¦</p>}
-              {pendingError && <p className="text-red-600">{pendingError}</p>}
-
-              {!pendingLoading && pendingUsers.length === 0 && (
-                <p className="text-gray-500">No pending users</p>
-              )}
-
-              {!pendingLoading && pendingUsers.length > 0 && (
-                <div className="space-y-3">
-                  {pendingUsers.map((pending) => (
-                    <div
-                      key={pending.email}
-                      className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
-                    >
-                      <div>
-                        <p className="font-semibold">{pending.name || 'Unnamed'}</p>
-                        <p className="text-sm text-gray-600">{pending.email}</p>
-                        <p className="text-xs text-gray-500 capitalize">{pending.role || 'student'}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleApproveUser(pending.email)}
-                          className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded transition"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleRejectUser(pending.email)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
             <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
               <h2 className="text-2xl font-bold mb-4">Attendance Queue ({selectedDate})</h2>
