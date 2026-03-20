@@ -1129,6 +1129,28 @@ export default function AdminDashboard({ user, userName }) {
           try {
             const response = await reportAPI.getMonthlyReport(month, yearlyYear);
             const data = response.data.data || {};
+            const bookings = Array.isArray(data.bookings) ? data.bookings : [];
+
+            const studentCounts = {};
+            const teacherCounts = {};
+            bookings.forEach((booking) => {
+              const role = String(booking.role || '').toLowerCase();
+              if (!role || role === 'student') {
+                const key = booking.studentName || booking.bookedByName || booking.studentId || 'Unknown';
+                studentCounts[key] = (studentCounts[key] || 0) + 1;
+              }
+              if (role === 'teacher' || booking.teacherName || booking.teacherId) {
+                const key = booking.teacherName || booking.teacherId || 'Unknown';
+                teacherCounts[key] = (teacherCounts[key] || 0) + 1;
+              }
+            });
+
+            const getTop = (map) => {
+              const entries = Object.entries(map).map(([name, value]) => ({ name, value }));
+              entries.sort((a, b) => b.value - a.value);
+              return entries[0] || { name: 'None', value: 0 };
+            };
+
             return {
               month,
               monthName: new Date(yearlyYear, month - 1, 1).toLocaleString('default', {
@@ -1138,6 +1160,14 @@ export default function AdminDashboard({ user, userName }) {
               upcomingBookings: data.upcomingBookings || 0,
               attendedBookings: data.attendedBookings || 0,
               cancelledBookings: data.cancelledBookings || 0,
+              missedBookings: data.missedBookings || 0,
+              bookings,
+              attendanceRate:
+                data.attendedBookings || data.missedBookings
+                  ? Math.round((data.attendedBookings || 0) / Math.max((data.attendedBookings || 0) + (data.missedBookings || 0), 1) * 100)
+                  : 0,
+              topStudent: getTop(studentCounts),
+              topTeacher: getTop(teacherCounts),
             };
           } catch (err) {
             return {
@@ -1149,12 +1179,30 @@ export default function AdminDashboard({ user, userName }) {
               upcomingBookings: 0,
               attendedBookings: 0,
               cancelledBookings: 0,
+              missedBookings: 0,
+              bookings: [],
+              attendanceRate: 0,
+              topStudent: { name: 'None', value: 0 },
+              topTeacher: { name: 'None', value: 0 },
             };
           }
         })
       );
 
       setYearlyReport(monthlyReports);
+      setDetailBookings(
+        monthlyReports.map((item) => ({
+          date: `${yearlyYear}-${String(item.month).padStart(2, '0')}-01`,
+          bookings: item.bookings || [],
+        }))
+      );
+
+      setDetailClasses([]);
+      const yearFeedback = (feedbackEntries || []).filter((entry) => {
+        const createdAt = toDateObject(entry.createdAt);
+        return createdAt && createdAt.getFullYear() === yearlyYear;
+      });
+      setDetailFeedback(yearFeedback);
     } catch (err) {
       setReportError(err.response?.data?.message || 'Failed to generate yearly report');
     } finally {
@@ -1206,22 +1254,34 @@ export default function AdminDashboard({ user, userName }) {
             {data.map((monthData) => (
               <div key={monthData.month} className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                 <h4 className="text-lg font-semibold text-slate-800 mb-3">{monthData.monthName}</h4>
-                <div className="space-y-2">
+                <div className="space-y-2 text-sm text-slate-600">
                   <div className="flex justify-between">
-                    <span className="text-sm text-slate-600">Total:</span>
+                    <span>Total:</span>
                     <span className="font-semibold">{monthData.totalBookings || 0}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-slate-600">Upcoming:</span>
+                    <span>Upcoming:</span>
                     <span className="font-semibold">{monthData.upcomingBookings || 0}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-slate-600">Attended:</span>
+                    <span>Attended:</span>
                     <span className="font-semibold">{monthData.attendedBookings || 0}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-slate-600">Cancelled:</span>
+                    <span>Cancelled:</span>
                     <span className="font-semibold">{monthData.cancelledBookings || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Attendance %:</span>
+                    <span className="font-semibold">{monthData.attendanceRate ?? 0}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Top Student:</span>
+                    <span className="font-semibold">{monthData.topStudent?.name || 'None'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Top Teacher:</span>
+                    <span className="font-semibold">{monthData.topTeacher?.name || 'None'}</span>
                   </div>
                 </div>
               </div>
@@ -1508,11 +1568,22 @@ export default function AdminDashboard({ user, userName }) {
 
   const fetchDetailedReportData = async () => {
     if (reportTab === 'yearly') {
-      // For yearly reports, do not run daily detail queries.
+      // For yearly reports, do not run daily detail queries but load precomputed yearly detail from state.
       setDetailError('');
-      setDetailBookings([]);
+      const yearBookings = Array.isArray(yearlyReport)
+        ? yearlyReport.map((month) => ({
+            date: `${yearlyYear}-${String(month.month).padStart(2, '0')}-01`,
+            bookings: month.bookings || [],
+          }))
+        : [];
+      setDetailBookings(yearBookings);
       setDetailClasses([]);
-      setDetailFeedback([]);
+
+      const yearFeedback = (feedbackEntries || []).filter((entry) => {
+        const createdAt = toDateObject(entry.createdAt);
+        return createdAt && createdAt.getFullYear() === yearlyYear;
+      });
+      setDetailFeedback(yearFeedback);
       return;
     }
 
@@ -2272,6 +2343,9 @@ export default function AdminDashboard({ user, userName }) {
   };
 
   const DetailCharts = () => {
+    const isYearlyReport = reportTab === 'yearly';
+    const yearlyChartData = Array.isArray(yearlyReport) ? yearlyReport : [];
+
     if (detailLoading) {
       return (
         <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
@@ -2318,42 +2392,44 @@ export default function AdminDashboard({ user, userName }) {
 
     return (
       <>
-        <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
-          <h3 className="text-xl font-bold mb-4">Bookings by Status Over Time</h3>
-          <div className="flex flex-wrap gap-4 text-xs text-gray-600 mb-4">
-            {REPORT_STATUS_KEYS.map((status) => (
-              <div key={status} className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded ${statusColors[status]}`} />
-                <span className="capitalize">{status}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-end gap-2 h-48">
-            {bookingStatusSeries.map((entry) => {
-              const total = REPORT_STATUS_KEYS.reduce((sum, status) => sum + (entry[status] || 0), 0);
-              const heightPercent = (total / maxDailyTotal) * 100;
-              return (
-                <div key={entry.date} className="flex flex-col items-center flex-1 min-w-[24px]">
-                  <div className="w-full h-40 bg-slate-100 rounded overflow-hidden flex flex-col justify-end">
-                    {REPORT_STATUS_KEYS.map((status) => {
-                      const value = entry[status];
-                      if (!value) return null;
-                      const segment = total > 0 ? (value / total) * heightPercent : 0;
-                      return (
-                        <div
-                          key={`${entry.date}-${status}`}
-                          className={`${statusColors[status]} w-full`}
-                          style={{ height: `${segment}%` }}
-                        />
-                      );
-                    })}
-                  </div>
-                  <span className="text-[10px] text-gray-500 mt-2">{entry.date.slice(5)}</span>
+        {!isYearlyReport && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
+            <h3 className="text-xl font-bold mb-4">Bookings by Status Over Time</h3>
+            <div className="flex flex-wrap gap-4 text-xs text-gray-600 mb-4">
+              {REPORT_STATUS_KEYS.map((status) => (
+                <div key={status} className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded ${statusColors[status]}`} />
+                  <span className="capitalize">{status}</span>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+            <div className="flex items-end gap-2 h-48">
+              {bookingStatusSeries.map((entry) => {
+                const total = REPORT_STATUS_KEYS.reduce((sum, status) => sum + (entry[status] || 0), 0);
+                const heightPercent = (total / maxDailyTotal) * 100;
+                return (
+                  <div key={entry.date} className="flex flex-col items-center flex-1 min-w-[24px]">
+                    <div className="w-full h-40 bg-slate-100 rounded overflow-hidden flex flex-col justify-end">
+                      {REPORT_STATUS_KEYS.map((status) => {
+                        const value = entry[status];
+                        if (!value) return null;
+                        const segment = total > 0 ? (value / total) * heightPercent : 0;
+                        return (
+                          <div
+                            key={`${entry.date}-${status}`}
+                            className={`${statusColors[status]} w-full`}
+                            style={{ height: `${segment}%` }}
+                          />
+                        );
+                      })}
+                    </div>
+                    <span className="text-[10px] text-gray-500 mt-2">{entry.date.slice(5)}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
           <h3 className="text-xl font-bold mb-4">Attendance Rate (%)</h3>
@@ -2411,71 +2487,90 @@ export default function AdminDashboard({ user, userName }) {
           <p className="text-xs text-gray-500 mt-2">Attendance rate line graph</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
-          <h3 className="text-xl font-bold mb-4">Peak Booking Hours</h3>
-          <div className="w-full overflow-x-auto">
-            <svg viewBox="0 0 1000 240" className="w-full min-w-[700px] h-56">
-              <rect x="0" y="0" width="1000" height="240" fill="#f8fafc" />
-              {peakAxisTicks.map((value) => {
-                const yPos = 190 - ((value / maxPeak) * 160);
-                return (
-                  <g key={`peak-tick-${value}`}>
-                    <line x1="56" y1={yPos} x2="960" y2={yPos} stroke="#e2e8f0" strokeWidth="1" />
-                    <text x="12" y={yPos + 3} fontSize="11" fill="#64748b">{value}</text>
-                  </g>
-                );
+        {isYearlyReport && yearlyChartData.length > 0 && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
+            <h3 className="text-xl font-bold mb-4">Monthly Booking Status Pie Charts</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {yearlyChartData.map((month) => {
+                const statusData = [
+                  { label: 'Attended', value: month.attendedBookings || 0, color: '#22c55e' },
+                  { label: 'Cancelled', value: month.cancelledBookings || 0, color: '#ef4444' },
+                  { label: 'Missed', value: month.missedBookings || 0, color: '#f59e0b' },
+                  { label: 'Upcoming', value: month.upcomingBookings || 0, color: '#3b82f6' },
+                ];
+                return <PieChart key={month.month} title={month.monthName} data={statusData} />;
               })}
+            </div>
+          </div>
+        )}
 
-              <polyline
-                fill="none"
-                stroke="#2563eb"
-                strokeWidth="3"
-                points={hourlyBookingSeries
-                  .map((item, idx) => {
-                    const x = 56 + (idx * (960 - 56)) / 23;
-                    const y = 190 - ((item.value / maxPeak) * 160);
-                    return `${x},${y}`;
-                  })
-                  .join(' ')}
-              />
+        {!isYearlyReport && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
+            <h3 className="text-xl font-bold mb-4">Peak Booking Hours</h3>
+            <div className="w-full overflow-x-auto">
+              <svg viewBox="0 0 1000 240" className="w-full min-w-[700px] h-56">
+                <rect x="0" y="0" width="1000" height="240" fill="#f8fafc" />
+                {peakAxisTicks.map((value) => {
+                  const yPos = 190 - ((value / maxPeak) * 160);
+                  return (
+                    <g key={`peak-tick-${value}`}>
+                      <line x1="56" y1={yPos} x2="960" y2={yPos} stroke="#e2e8f0" strokeWidth="1" />
+                      <text x="12" y={yPos + 3} fontSize="11" fill="#64748b">{value}</text>
+                    </g>
+                  );
+                })}
 
-              {hourlyBookingSeries.map((item, idx) => {
-                const x = 56 + (idx * (960 - 56)) / 23;
-                const y = 190 - ((item.value / maxPeak) * 160);
-                const isLabelHour = idx % 2 === 0;
-                return (
-                  <g key={item.hour}>
-                    <circle cx={x} cy={y} r="3.5" fill="#1d4ed8" />
-                    {isLabelHour && (
-                      <text x={x - 16} y="214" fontSize="10" fill="#475569">
-                        {formatHourLabel12h(item.hour)}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
+                <polyline
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth="3"
+                  points={hourlyBookingSeries
+                    .map((item, idx) => {
+                      const x = 56 + (idx * (960 - 56)) / 23;
+                      const y = 190 - ((item.value / maxPeak) * 160);
+                      return `${x},${y}`;
+                    })
+                    .join(' ')}
+                />
+
+                {hourlyBookingSeries.map((item, idx) => {
+                  const x = 56 + (idx * (960 - 56)) / 23;
+                  const y = 190 - ((item.value / maxPeak) * 160);
+                  const isLabelHour = idx % 2 === 0;
+                  return (
+                    <g key={item.hour}>
+                      <circle cx={x} cy={y} r="3.5" fill="#1d4ed8" />
+                      {isLabelHour && (
+                        <text x={x - 16} y="214" fontSize="10" fill="#475569">
+                          {formatHourLabel12h(item.hour)}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Hourly bookings (12-hour format)</p>
+            <h4 className="text-sm font-semibold text-gray-700 mt-4 mb-2">Real Peak Hours</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4 text-sm">
+              {peakHours.slice(0, 6).map((item) => (
+                <div key={`peak-${item.hour}`} className="bg-blue-50 border border-blue-100 rounded px-3 py-2">
+                  <span className="font-semibold">{formatHourLabel12h(item.hour)}</span>
+                  <span className="text-gray-600"> - {item.value} bookings</span>
+                </div>
+              ))}
+            </div>
+            <h4 className="text-sm font-semibold text-gray-700 mt-5 mb-2">Predicted Peak Hours (Next Day)</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+              {predictedPeakHours.map((item) => (
+                <div key={`pred-peak-${item.hour}`} className="bg-emerald-50 border border-emerald-100 rounded px-3 py-2">
+                  <span className="font-semibold">{formatHourLabel12h(item.hour)}</span>
+                  <span className="text-gray-600"> - {item.value} predicted</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Hourly bookings (12-hour format)</p>
-          <h4 className="text-sm font-semibold text-gray-700 mt-4 mb-2">Real Peak Hours</h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4 text-sm">
-            {peakHours.slice(0, 6).map((item) => (
-              <div key={`peak-${item.hour}`} className="bg-blue-50 border border-blue-100 rounded px-3 py-2">
-                <span className="font-semibold">{formatHourLabel12h(item.hour)}</span>
-                <span className="text-gray-600"> - {item.value} bookings</span>
-              </div>
-            ))}
-          </div>
-          <h4 className="text-sm font-semibold text-gray-700 mt-5 mb-2">Predicted Peak Hours (Next Day)</h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-            {predictedPeakHours.map((item) => (
-              <div key={`pred-peak-${item.hour}`} className="bg-emerald-50 border border-emerald-100 rounded px-3 py-2">
-                <span className="font-semibold">{formatHourLabel12h(item.hour)}</span>
-                <span className="text-gray-600"> - {item.value} predicted</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
           <div className="bg-white rounded-lg shadow-lg p-6">
