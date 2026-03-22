@@ -969,6 +969,20 @@ export default function AdminDashboard({ user, userName }) {
     }
   };
 
+  const handleReactivateAccount = async (uid, label) => {
+    if (!window.confirm(`Mark account for ${label} as active again?`)) return;
+    setAccountsError('');
+    setAccountsMessage('');
+    try {
+      await authAPI.updateUserByUid(uid, { status: 'approved' });
+      await fetchAccountsData();
+      await fetchSectionData();
+      setAccountsMessage('Account marked active again.');
+    } catch (err) {
+      setAccountsError(err.response?.data?.message || 'Failed to reactivate account');
+    }
+  };
+
   const handlePermanentDeleteAccount = async (uid, label) => {
     if (!window.confirm(`Permanently delete inactive account for ${label}? This cannot be undone.`)) return;
     setAccountsError('');
@@ -3241,13 +3255,22 @@ export default function AdminDashboard({ user, userName }) {
                             {acct.role || 'user'} • Inactive: {formatFeedbackDate(acct.inactiveAt)}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handlePermanentDeleteAccount(acct.uid, acct.name || acct.email || acct.uid)}
-                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition"
-                        >
-                          Delete Permanently
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleReactivateAccount(acct.uid, acct.name || acct.email || acct.uid)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded transition"
+                          >
+                            Mark Active
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handlePermanentDeleteAccount(acct.uid, acct.name || acct.email || acct.uid)}
+                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition"
+                          >
+                            Delete Permanently
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

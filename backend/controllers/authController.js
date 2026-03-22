@@ -668,9 +668,28 @@ exports.updateUserAccount = async (req, res) => {
       section: String(existing.role || '').toLowerCase() === 'student' ? section : null,
     };
 
+    const statusRaw = req.body?.status;
+    if (statusRaw != null) {
+      const statusValue = String(statusRaw || '').trim().toLowerCase();
+      if (['approved', 'inactive'].includes(statusValue)) {
+        patch.status = statusValue;
+        if (statusValue === 'approved') {
+          patch.inactiveAt = null;
+          patch.inactiveBy = null;
+        }
+      }
+    }
+
     await User.update(uid, patch);
     try {
-      await auth.updateUser(uid, { displayName: patch.name || undefined });
+      const authUpdate = { displayName: patch.name || undefined };
+      if (patch.status === 'approved') {
+        authUpdate.disabled = false;
+      }
+      if (patch.status === 'inactive') {
+        authUpdate.disabled = true;
+      }
+      await auth.updateUser(uid, authUpdate);
     } catch (authErr) {
       // Keep Firestore update as source of truth even if Auth profile update fails.
     }
