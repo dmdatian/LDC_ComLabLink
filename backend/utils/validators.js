@@ -39,7 +39,7 @@ const validateBookingData = async (data) => {
   const errors = [];
 
   // Basic fields
-  if (!data.studentId) errors.push('Student ID required');
+  if (!data.studentId && !data.studentName) errors.push('Student ID or student name required');
   if (!data.date) errors.push('Date required');
   if (!data.startTime) errors.push('Start time required');
   if (!data.endTime) errors.push('End time required');

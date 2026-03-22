@@ -420,7 +420,7 @@ export default function TeacherDashboard({ user, userName }) {
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-2">Personal Booking</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Use this when you are booking a seat for yourself. Grade level and section are not needed for teacher personal bookings.
+                  Use this when you are booking a seat for yourself.
                 </p>
                 <SeatBooking
                   userName={userName || user?.displayName || user?.name || 'Teacher'}
@@ -432,7 +432,7 @@ export default function TeacherDashboard({ user, userName }) {
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-2">Special Booking For Student</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Use this for research, project, or special activity bookings for a student. This section includes the student, grade level, and section details.
+                  Use this for research, project, or special activity bookings for your students. 
                 </p>
                 <SeatBooking
                   userName={userName || user?.displayName || user?.name || 'Teacher'}

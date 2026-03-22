@@ -17,6 +17,7 @@ const {
 } = require('../utils/fixedSchedule');
 
 const MAX_BOOKINGS_PER_WEEK_PER_USER = 2;
+const MAX_TEACHER_ACTIVE_BOOKINGS = 10;
 const ATTENDANCE_CONFIRMATION_WINDOW_MINUTES = 15;
 // Pending booking workflow is no longer used. All new bookings are approved if valid.
 const ACTIVE_BOOKING_STATUSES = new Set(['approved']);
@@ -340,7 +341,23 @@ const hasBlockedSeatConflict = async (seatIds, date, startDateTime, endDateTime)
 // SEAT BOOKING: create
 exports.createBooking = async (req, res) => {
   try {
-    const { date, startTime, endTime, startClock, endClock, seats, purpose, subject, studentId: requestedStudentId } = req.body;
+    const {
+      date,
+      startTime,
+      endTime,
+      startClock,
+      endClock,
+      seats,
+      purpose,
+      subject,
+      studentId: requestedStudentId,
+      studentName: manualStudentName,
+      gradeLevelId: requestedGradeLevelId,
+      gradeLevel: requestedGradeLevel,
+      sectionId: requestedSectionId,
+      section: requestedSection,
+    } = req.body;
+
     const normalizedSeats = normalizeSeats(seats);
     const normalizedStartClock = normalizeTime(startClock || String(startTime || '').slice(11, 16));
     const normalizedEndClock = normalizeTime(endClock || String(endTime || '').slice(11, 16));
@@ -360,14 +377,60 @@ exports.createBooking = async (req, res) => {
 
     const requesterRole = String(req.user.role || '').toLowerCase();
     const isTeacherCreatingForStudent = requesterRole === 'teacher' && String(requestedStudentId || '').trim();
-    const targetStudentId = isTeacherCreatingForStudent ? String(requestedStudentId).trim() : String(req.user.uid || '').trim();
-    const targetStudent = await User.getById(targetStudentId);
+    const isTeacherManualStudent = requesterRole === 'teacher' && !isTeacherCreatingForStudent && String(manualStudentName || '').trim();
 
-    if (!targetStudent) {
-      return sendError(res, 404, 'Selected student not found');
+    let targetStudent = null;
+    let targetStudentId = null;
+    let targetStudentName = '';
+    let targetGradeLevelId = requestedGradeLevelId || null;
+    let targetGradeLevel = requestedGradeLevel || null;
+    let targetSectionId = requestedSectionId || null;
+    let targetSection = requestedSection || null;
+
+    if (isTeacherCreatingForStudent) {
+      targetStudentId = String(requestedStudentId).trim();
+      targetStudent = await User.getById(targetStudentId);
+      if (!targetStudent) {
+        return sendError(res, 404, 'Selected student not found');
+      }
+      if (String(targetStudent.role || '').toLowerCase() !== 'student') {
+        return sendError(res, 400, 'Teachers can only book for student accounts');
+      }
+      targetStudentName = targetStudent.name || '';
+      targetGradeLevelId = targetStudent.gradeLevelId || targetGradeLevelId;
+      targetGradeLevel = targetStudent.gradeLevel || targetGradeLevel;
+      targetSectionId = targetStudent.sectionId || targetSectionId;
+      targetSection = targetStudent.section || targetSection;
+    } else if (isTeacherManualStudent) {
+      targetStudentId = null;
+      targetStudentName = String(manualStudentName).trim();
+      targetGradeLevelId = requestedGradeLevelId || targetGradeLevelId;
+      targetGradeLevel = requestedGradeLevel || targetGradeLevel;
+      targetSectionId = requestedSectionId || targetSectionId;
+      targetSection = requestedSection || targetSection;
+    } else {
+      targetStudentId = String(req.user.uid || '').trim();
+      targetStudent = await User.getById(targetStudentId);
+      if (!targetStudent) {
+        return sendError(res, 404, 'Current user not found');
+      }
+      targetStudentName = targetStudent.name || '';
+      targetGradeLevelId = targetStudent.gradeLevelId || targetGradeLevelId;
+      targetGradeLevel = targetStudent.gradeLevel || targetGradeLevel;
+      targetSectionId = targetStudent.sectionId || targetSectionId;
+      targetSection = targetStudent.section || targetSection;
     }
-    if (isTeacherCreatingForStudent && String(targetStudent.role || '').toLowerCase() !== 'student') {
-      return sendError(res, 400, 'Teachers can only book for student accounts');
+
+    if (requesterRole === 'teacher') {
+      const teacherBookings = await Booking.getByBookedById(req.user.uid);
+      const todayKey = new Date().toISOString().split('T')[0];
+      const activeTeacherBookings = teacherBookings.filter((b) => {
+        if (!isActiveBookingStatus(b.status)) return false;
+        return String(b.date || '') >= todayKey;
+      });
+      if (activeTeacherBookings.length >= MAX_TEACHER_ACTIVE_BOOKINGS) {
+        return sendError(res, 409, 'Booking limit reached. Teachers can only have up to 10 active bookings at a time.');
+      }
     }
 
     // Validate input
@@ -386,7 +449,7 @@ exports.createBooking = async (req, res) => {
       return sendError(res, 400, 'Bookings are not allowed on Saturday or Sunday');
     }
 
-    if (isTeacherCreatingForStudent) {
+    if (requesterRole === 'teacher' && (isTeacherCreatingForStudent || isTeacherManualStudent)) {
       const allowedTeacherWindow = getCurrentMonthBookingWindow(new Date());
       if (allowedTeacherWindow && (date < allowedTeacherWindow.startDate || date > allowedTeacherWindow.endDate)) {
         return sendError(res, 409, 'Teacher bookings for students are only allowed within the current month.');
@@ -398,8 +461,10 @@ exports.createBooking = async (req, res) => {
       }
     }
 
-    const existingUserBookings = await Booking.getByStudentId(targetStudentId);
-    await applyAttendanceAutomation(existingUserBookings, { reminderUserId: targetStudentId });
+    const existingUserBookings = targetStudentId ? await Booking.getByStudentId(targetStudentId) : [];
+    if (targetStudentId) {
+      await applyAttendanceAutomation(existingUserBookings, { reminderUserId: targetStudentId });
+    }
 
     if (requesterRole !== 'teacher' && !isTeacherCreatingForStudent) {
       const weekRange = getWeekRangeForDateKey(date);
@@ -527,10 +592,12 @@ exports.createBooking = async (req, res) => {
     // --- Create booking ---
     const bookingResult = await Booking.create({
       studentId: targetStudentId,
-      studentName: targetStudent.name || req.user.name || 'Unknown',
-      role: String(targetStudent.role || requesterRole || 'student').toLowerCase(),
+      studentName: targetStudentName || req.user.name || 'Unknown',
+      role: (isTeacherCreatingForStudent || isTeacherManualStudent)
+        ? 'student'
+        : String(targetStudent?.role || requesterRole || 'student').toLowerCase(),
       bookedById: req.user.uid,
-      bookedByName: req.user.name || targetStudent.name || 'Unknown',
+      bookedByName: req.user.name || (targetStudentName || 'Unknown'),
       bookedByRole: requesterRole || 'student',
       teacherId: requesterRole === 'teacher' ? req.user.uid : null,
       teacherName: requesterRole === 'teacher' ? (req.user.name || null) : null,
@@ -542,10 +609,10 @@ exports.createBooking = async (req, res) => {
       seats: normalizedSeats,
       purpose,
       subject,
-      gradeLevelId: targetStudent.gradeLevelId || null,
-      gradeLevel: targetStudent.gradeLevel || null,
-      sectionId: targetStudent.sectionId || null,
-      section: targetStudent.section || null,
+      gradeLevelId: targetGradeLevelId || null,
+      gradeLevel: targetGradeLevel || null,
+      sectionId: targetSectionId || null,
+      section: targetSection || null,
       status: 'approved',
       attendanceDeadlineAt,
     });

@@ -180,12 +180,14 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
 
   useEffect(() => {
     if (!teacherBookingMode) return;
+    if (!selectedStudentId) return;
+
     const selectedStudent = studentOptions.find((item) => item.uid === selectedStudentId);
     if (!selectedStudent) {
-      setGradeLevelId('');
-      setSectionId('');
       return;
     }
+
+    setName(selectedStudent.name || '');
 
     const matchedGrade = gradeLevels.find((item) => {
       const gradeText = String(selectedStudent.gradeLevel || '').trim().toLowerCase();
@@ -433,14 +435,28 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       return;
     }
 
-    if (teacherBookingMode && !selectedStudentId) {
-      setStatusMessage('Please select a student for this booking.');
+    if (teacherBookingMode && (!gradeLevelId || !sectionId)) {
+      setStatusMessage('Please select grade level and section for special booking.');
       return;
     }
 
     if (!teacherBookingMode && needsAcademicFields && (!selectedGrade || !selectedSection)) {
       setStatusMessage('Please fill all required fields and select a seat.');
       return;
+    }
+
+    if (teacherBookingMode) {
+      const myBookingsResponse = await seatsAPI.getMySeats();
+      const myBookings = Array.isArray(myBookingsResponse?.data?.data) ? myBookingsResponse.data.data : [];
+      const upcomingBookingsCount = myBookings.filter((booking) => {
+        if (!isActiveBookingStatus(booking?.status)) return false;
+        return String(booking?.date || '') >= toLocalDateKey();
+      }).length;
+
+      if (upcomingBookingsCount >= 10) {
+        setStatusMessage('Booking limit reached. Teachers can only reserve up to 10 active bookings.');
+        return;
+      }
     }
 
     if (startTime >= endTime) {
@@ -464,7 +480,8 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
 
     try {
       const createResponse = await seatsAPI.createSeatBooking({
-        studentId: teacherBookingMode ? selectedStudentId : undefined,
+        studentId: teacherBookingMode ? (selectedStudentId || undefined) : undefined,
+        studentName: name.trim(),
         seats: [selectedSeat],
         date,
         startClock: startTime,
@@ -473,9 +490,9 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
         endTime: `${date}T${endTime}:00`,
         purpose: trimmedPurpose,
         subject: trimmedSubject,
-        gradeLevelId: selectedGrade?.id || null,
+        gradeLevelId: selectedGrade?.id || gradeLevelId || null,
         gradeLevel: selectedGrade?.name || selectedGrade?.id || null,
-        sectionId: selectedSection?.id || null,
+        sectionId: selectedSection?.id || sectionId || null,
         section: selectedSection?.name || selectedSection?.id || null,
       });
 
@@ -559,8 +576,69 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       <div className="form-grid">
         <div className="full-span">
           <label>Name</label>
-          <input value={name} readOnly className={profileLocked ? 'bg-gray-100 text-gray-700 cursor-not-allowed' : ''} />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={teacherBookingMode ? 'Enter student name for special booking' : ''}
+            readOnly={!teacherBookingMode && profileLocked}
+            className={`${!teacherBookingMode && profileLocked ? 'bg-gray-100 text-gray-700 cursor-not-allowed' : ''}`}
+          />
         </div>
+
+        {teacherBookingMode && (
+          <>
+            <div>
+              <label>Grade Level</label>
+              <select
+                value={gradeLevelId}
+                onChange={(e) => {
+                  setGradeLevelId(e.target.value);
+                  setSectionId('');
+                }}
+                required
+              >
+                <option value="">Select grade level</option>
+                {gradeLevels.map((grade) => (
+                  <option key={grade.id} value={grade.id}>
+                    {grade.name || grade.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label>Section</label>
+              <select
+                value={sectionId}
+                onChange={(e) => setSectionId(e.target.value)}
+                disabled={!gradeLevelId}
+                required
+              >
+                <option value="">{gradeLevelId ? 'Select section' : 'Select grade level first'}</option>
+                {filteredSections.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name || item.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="full-span">
+              <label>Select Registered Student (optional)</label>
+              <select
+                value={selectedStudentId}
+                onChange={(e) => setSelectedStudentId(e.target.value)}
+              >
+                <option value="">Manual entry / none</option>
+                {studentOptions.map((student) => (
+                  <option key={student.uid} value={student.uid}>
+                    {student.name} {student.gradeLevel || student.section ? `- ${[student.gradeLevel, student.section].filter(Boolean).join(' / ')}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
 
         <div>
           <label>Date</label>
