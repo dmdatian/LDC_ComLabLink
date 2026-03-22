@@ -95,7 +95,7 @@ const isWeekendDate = (dateKey) => {
   return day === 0 || day === 6;
 };
 
-export default function SeatBooking({ userName, onBookingCreated, hideAcademicFields = false, teacherBookingMode = false }) {
+export default function SeatBooking({ userName, onBookingCreated, hideAcademicFields = false, teacherBookingMode = false, allowMultipleSeats = false }) {
   const toLocalDateKey = (dateObj = new Date()) => {
     const year = dateObj.getFullYear();
     const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -106,6 +106,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   // STATE: form + availability
   const [name, setName] = useState(userName || '');
   const [selectedSeat, setSelectedSeat] = useState('');
+  const [selectedSeats, setSelectedSeats] = useState([]);
   const [bookedSeats, setBookedSeats] = useState([]);
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -382,7 +383,18 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   // Toggle seat selection
   const toggleSeat = (seat) => {
     if (bookedSeats.includes(seat)) return;
-    setSelectedSeat((prev) => (prev === seat ? '' : seat));
+    
+    if (allowMultipleSeats) {
+      // Multiple seat selection for special bookings
+      setSelectedSeats((prev) => 
+        prev.includes(seat) 
+          ? prev.filter((s) => s !== seat) 
+          : [...prev, seat]
+      );
+    } else {
+      // Single seat selection for regular bookings
+      setSelectedSeat((prev) => (prev === seat ? '' : seat));
+    }
   };
 
   // Handle booking submission
@@ -391,9 +403,12 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
     const trimmedPurpose = purpose.trim();
     const trimmedSubject = subject.trim();
     const needsAcademicFields = !hideAcademicFields || teacherBookingMode;
+    
+    const hasSeats = allowMultipleSeats ? selectedSeats.length > 0 : selectedSeat;
+    const seatMessage = allowMultipleSeats ? 'select at least one seat' : 'select a seat';
 
-    if (!name.trim() || !selectedSeat || !date || !startTime || !endTime || !trimmedPurpose || !trimmedSubject) {
-      setStatusMessage('Please fill all required fields and select a seat.');
+    if (!name.trim() || !hasSeats || !date || !startTime || !endTime || !trimmedPurpose || !trimmedSubject) {
+      setStatusMessage(`Please fill all required fields and ${seatMessage}.`);
       return;
     }
 
@@ -445,7 +460,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
         studentId: undefined,
         studentName: teacherBookingMode ? studentName.trim() : name.trim(),
         studentCount: teacherBookingMode ? studentCount : undefined,
-        seats: [selectedSeat],
+        seats: allowMultipleSeats ? selectedSeats : [selectedSeat],
         date,
         startClock: startTime,
         endClock: endTime,
@@ -464,7 +479,11 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       }
 
       setStatusMessage('Booking successful!');
-      setSelectedSeat('');
+      if (allowMultipleSeats) {
+        setSelectedSeats([]);
+      } else {
+        setSelectedSeat('');
+      }
       setPurpose('');
       setSubject('');
       if (teacherBookingMode) {
@@ -493,7 +512,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   const renderSeat = (seat) => {
     const seatId = seat.id || `${seat.row}${seat.column}`;
     const isBooked = bookedSeats.includes(seatId);
-    const isSelected = selectedSeat === seatId;
+    const isSelected = allowMultipleSeats ? selectedSeats.includes(seatId) : selectedSeat === seatId;
 
     return (
       <button

@@ -438,6 +438,7 @@ export default function TeacherDashboard({ user, userName }) {
                   userName={userName || user?.displayName || user?.name || 'Teacher'}
                   onBookingCreated={handleBookingCreated}
                   teacherBookingMode
+                  allowMultipleSeats
                 />
               </div>
             </div>
