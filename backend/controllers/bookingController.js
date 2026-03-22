@@ -437,6 +437,7 @@ exports.createBooking = async (req, res) => {
     // Validate input
     const validation = await validateBookingData({ 
       studentId: targetStudentId,
+      studentName: targetStudentName,
       date,
       startTime: startDateTime,
       endTime: endDateTime
