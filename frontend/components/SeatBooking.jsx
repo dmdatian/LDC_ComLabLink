@@ -383,14 +383,22 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   // Toggle seat selection
   const toggleSeat = (seat) => {
     if (bookedSeats.includes(seat)) return;
-    
+
     if (allowMultipleSeats) {
-      // Multiple seat selection for special bookings
-      setSelectedSeats((prev) => 
-        prev.includes(seat) 
-          ? prev.filter((s) => s !== seat) 
-          : [...prev, seat]
-      );
+      // Multiple seat selection for special bookings (max by studentCount)
+      setSelectedSeats((prev) => {
+        if (prev.includes(seat)) {
+          return prev.filter((s) => s !== seat);
+        }
+
+        if (prev.length >= studentCount) {
+          setStatusMessage(`You can select up to ${studentCount} seats for this special booking.`);
+          return prev;
+        }
+
+        setStatusMessage('');
+        return [...prev, seat];
+      });
     } else {
       // Single seat selection for regular bookings
       setSelectedSeat((prev) => (prev === seat ? '' : seat));
@@ -432,6 +440,11 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
 
       if (upcomingBookingsCount >= 10) {
         setStatusMessage('Booking limit reached. Teachers can only reserve up to 10 active bookings.');
+        return;
+      }
+
+      if (allowMultipleSeats && selectedSeats.length > studentCount) {
+        setStatusMessage(`Please select ${studentCount} or fewer seats as specified in Number of Students.`);
         return;
       }
     }
