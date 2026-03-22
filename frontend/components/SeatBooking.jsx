@@ -653,21 +653,37 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
               />
             </div>
 
-            <div>
-              <label>Number of Students</label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={studentCount}
-                onChange={(e) => {
-                  let val = Number(e.target.value);
-                  if (val < 1) val = 1;
-                  if (val > 10) val = 10;
-                  setStudentCount(val);
-                }}
-                required
-              />
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label>Number of Students</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={studentCount}
+                  onChange={(e) => {
+                    let val = Number(e.target.value);
+                    if (val < 1) val = 1;
+                    if (val > 10) val = 10;
+                    setStudentCount(val);
+                  }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label>Subject</label>
+                <select
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  required
+                >
+                  <option value="">Select a subject</option>
+                  {subjectsList.map(subj => (
+                    <option key={subj} value={subj}>{subj}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </>
         )}
@@ -742,19 +758,21 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
           </select>
         </div>
 
-        <div className="full-span">
-          <label>Subject</label>
-          <select
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            required
-          >
-            <option value="">Select a subject</option>
-            {subjectsList.map(subj => (
-              <option key={subj} value={subj}>{subj}</option>
-            ))}
-          </select>
-        </div>
+        {!teacherBookingMode && (
+          <div className="full-span">
+            <label>Subject</label>
+            <select
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              required
+            >
+              <option value="">Select a subject</option>
+              {subjectsList.map(subj => (
+                <option key={subj} value={subj}>{subj}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <button className="book-btn" onClick={handleBooking} type="button">
