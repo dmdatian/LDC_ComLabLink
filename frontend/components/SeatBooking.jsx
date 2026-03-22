@@ -471,7 +471,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
     try {
       const createResponse = await seatsAPI.createSeatBooking({
         studentId: undefined,
-        studentName: teacherBookingMode ? studentName.trim() : name.trim(),
+        studentName: teacherBookingMode ? name.trim() : name.trim(),
         studentCount: teacherBookingMode ? studentCount : undefined,
         seats: allowMultipleSeats ? selectedSeats : [selectedSeat],
         date,
