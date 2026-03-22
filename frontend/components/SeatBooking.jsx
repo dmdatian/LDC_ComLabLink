@@ -640,50 +640,6 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
           </>
         )}
 
-        {!hideAcademicFields && !teacherBookingMode && profileLocked && (
-          <>
-            <div>
-              <label>Grade Level</label>
-              <input
-                value={selectedGrade?.name || selectedGrade?.id || 'Assigned by admin'}
-                readOnly
-                className="bg-gray-100 text-gray-700 cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label>Section</label>
-              <input
-                value={selectedSection?.name || selectedSection?.id || 'Assigned by admin'}
-                readOnly
-                className="bg-gray-100 text-gray-700 cursor-not-allowed"
-              />
-            </div>
-          </>
-        )}
-
-        {!hideAcademicFields && teacherBookingMode && (
-          <>
-            <div>
-              <label>Grade Level</label>
-              <input
-                value={selectedGrade?.name || selectedStudent?.gradeLevel || 'Assigned by admin'}
-                readOnly
-                className="bg-gray-100 text-gray-700 cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label>Section</label>
-              <input
-                value={selectedSection?.name || selectedStudent?.section || 'Assigned by admin'}
-                readOnly
-                className="bg-gray-100 text-gray-700 cursor-not-allowed"
-              />
-            </div>
-          </>
-        )}
-
         {!hideAcademicFields && !teacherBookingMode && !profileLocked && (
           <>
             <div>
