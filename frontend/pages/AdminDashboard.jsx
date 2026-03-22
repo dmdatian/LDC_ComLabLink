@@ -1149,13 +1149,12 @@ export default function AdminDashboard({ user, userName }) {
             const teacherCounts = {};
             bookings.forEach((booking) => {
               const role = String(booking.role || '').toLowerCase();
-              if (!role || role === 'student') {
-                const key = booking.studentName || booking.bookedByName || booking.studentId || 'Unknown';
-                studentCounts[key] = (studentCounts[key] || 0) + 1;
-              }
               if (role === 'teacher' || booking.teacherName || booking.teacherId) {
                 const key = booking.teacherName || booking.teacherId || 'Unknown';
                 teacherCounts[key] = (teacherCounts[key] || 0) + 1;
+              } else {
+                const key = booking.studentName || booking.bookedByName || booking.studentId || 'Unknown';
+                studentCounts[key] = (studentCounts[key] || 0) + 1;
               }
             });
 
