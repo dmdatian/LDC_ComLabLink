@@ -1149,8 +1149,8 @@ export default function AdminDashboard({ user, userName }) {
             const teacherCounts = {};
             bookings.forEach((booking) => {
               const role = String(booking.role || '').toLowerCase();
-              if (role === 'teacher' || booking.teacherName || booking.teacherId) {
-                const key = booking.teacherName || booking.teacherId || 'Unknown';
+              if (role === 'teacher') {
+                const key = booking.teacherName || booking.teacherId || booking.studentName || booking.bookedByName || 'Unknown';
                 teacherCounts[key] = (teacherCounts[key] || 0) + 1;
               } else {
                 const key = booking.studentName || booking.bookedByName || booking.studentId || 'Unknown';
