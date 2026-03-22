@@ -10,6 +10,7 @@ class Booking {
       const docRef = await db.collection(COLLECTION).add({
         studentId: bookingData.studentId,
         studentName: bookingData.studentName,
+        studentCount: bookingData.studentCount || 1,
         role: bookingData.role || 'student',
         bookedById: bookingData.bookedById || bookingData.studentId || null,
         bookedByName: bookingData.bookedByName || bookingData.studentName || null,

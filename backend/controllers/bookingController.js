@@ -352,6 +352,7 @@ exports.createBooking = async (req, res) => {
       subject,
       studentId: requestedStudentId,
       studentName: manualStudentName,
+      studentCount: requestedStudentCount,
       gradeLevelId: requestedGradeLevelId,
       gradeLevel: requestedGradeLevel,
       sectionId: requestedSectionId,
@@ -593,6 +594,7 @@ exports.createBooking = async (req, res) => {
     const bookingResult = await Booking.create({
       studentId: targetStudentId,
       studentName: targetStudentName || req.user.name || 'Unknown',
+      studentCount: requestedStudentCount || 1,
       role: (isTeacherCreatingForStudent || isTeacherManualStudent)
         ? 'student'
         : String(targetStudent?.role || requesterRole || 'student').toLowerCase(),

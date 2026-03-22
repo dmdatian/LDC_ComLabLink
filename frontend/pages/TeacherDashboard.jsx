@@ -432,7 +432,7 @@ export default function TeacherDashboard({ user, userName }) {
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-2">Special Booking For Student</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Use this for research, project, or special activity bookings for your students. 
+                  Use this for research, project, or special activity bookings. Enter student name and how many students (up to 10).
                 </p>
                 <SeatBooking
                   userName={userName || user?.displayName || user?.name || 'Teacher'}
