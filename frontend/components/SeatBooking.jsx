@@ -359,11 +359,20 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
               ? [booking.seat]
               : [];
           
-          // For special bookings (teacher bookings with student name), show teacher name and student name
+          // Determine display name based on booking type
+          let displayName = '';
+          const isTeacherBooking = String(booking.bookedByRole || '').toLowerCase() === 'teacher';
+          const isPersonalTeacherBooking = isTeacherBooking && 
+            (booking.studentId === booking.bookedById || booking.studentName === booking.bookedByName);
           const isSpecialBooking = booking.studentName && booking.bookedByName && booking.studentName !== booking.bookedByName;
-          const displayName = isSpecialBooking 
-            ? `${booking.bookedByName}\nStudent: ${booking.studentName}`
-            : booking.studentName || booking.bookedByName || 'Booked';
+          
+          if (isPersonalTeacherBooking) {
+            displayName = `Teacher: ${booking.bookedByName}`;
+          } else if (isSpecialBooking) {
+            displayName = `${booking.bookedByName}\nStudent: ${booking.studentName}`;
+          } else {
+            displayName = booking.studentName || booking.bookedByName || 'Booked';
+          }
           
           seats.forEach((seatId) => {
             bookedInfo[seatId] = {
