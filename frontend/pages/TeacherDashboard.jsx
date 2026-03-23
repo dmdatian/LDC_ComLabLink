@@ -380,8 +380,11 @@ export default function TeacherDashboard({ user, userName }) {
                           <p className="font-semibold">
                             {booking.teacherName ? (booking.teacherName || userName || user?.displayName || user?.name || 'Teacher') : (booking.studentName || 'Teacher')}
                           </p>
-                          {booking.teacherName && (
-                            <p className="text-sm text-gray-600">Student: {booking.studentName || '-'}</p>
+                          {booking.teacherName && booking.studentName && booking.studentName !== booking.teacherName && (
+                            <p className="text-sm text-gray-600">Student: {booking.studentName}</p>
+                          )}
+                          {booking.teacherName && (!booking.studentName || booking.studentName === booking.teacherName) && (
+                            <p className="text-sm text-gray-600">Teacher: {booking.teacherName}</p>
                           )}
                           <p className="text-sm font-medium text-gray-700">
                             {booking.date || '-'}{' '}
