@@ -594,13 +594,13 @@ exports.createBooking = async (req, res) => {
     // --- Create booking ---
     const bookingResult = await Booking.create({
       studentId: targetStudentId,
-      studentName: requesterRole === 'teacher' ? (req.user.name || 'Unknown') : (targetStudentName || req.user.name || 'Unknown'),
+      studentName: targetStudentName || req.user.name || 'Unknown',
       studentCount: requestedStudentCount || 1,
       role: requesterRole === 'teacher' 
         ? 'teacher'
         : String(targetStudent?.role || 'student').toLowerCase(),
       bookedById: req.user.uid,
-      bookedByName: req.user.name || (targetStudentName || 'Unknown'),
+      bookedByName: req.user.name || 'Unknown',
       bookedByRole: requesterRole || 'student',
       teacherId: requesterRole === 'teacher' ? req.user.uid : null,
       teacherName: requesterRole === 'teacher' ? (req.user.name || null) : null,

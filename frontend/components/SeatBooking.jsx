@@ -107,7 +107,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   const [name, setName] = useState(userName || '');
   const [selectedSeat, setSelectedSeat] = useState('');
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [bookedSeats, setBookedSeats] = useState([]);
+  const [bookedSeatsInfo, setBookedSeatsInfo] = useState({});
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -302,7 +302,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       const catalog = normalizeSeatCatalog(data.seats || []);
       const blocks = data.seatBlocks || [];
       const fixedScheduleBlocks = data.fixedScheduleBlocks || [];
-      const booked = [];
+      const bookedInfo = {};
       const blockedByAdmin = [];
 
       setSeatCatalog(catalog);
@@ -318,7 +318,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
       });
 
       if (classConflict) {
-        setBookedSeats([]);
+        setBookedSeatsInfo({});
         setStatusMessage('Class is scheduled during this time. Booking will be rejected.');
         return;
       }
@@ -333,7 +333,12 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
 
       if (fixedScheduleConflict) {
         setIsFixedScheduleBlocked(true);
-        setBookedSeats(catalog.map((seat) => seat.id));
+        // Mark all seats as blocked by fixed schedule
+        catalog.forEach((seat) => {
+          const seatId = seat.id || `${seat.row}${seat.column}`;
+          bookedInfo[seatId] = { type: 'fixed-schedule' };
+        });
+        setBookedSeatsInfo(bookedInfo);
         setStatusMessage('Time slot is occupied by fixed schedule. Select other time.');
         return;
       }
@@ -353,7 +358,20 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
             : booking.seat
               ? [booking.seat]
               : [];
-          booked.push(...seats);
+          
+          // For special bookings (teacher bookings with student name), show teacher name and student name
+          const isSpecialBooking = booking.studentName && booking.bookedByName && booking.studentName !== booking.bookedByName;
+          const displayName = isSpecialBooking 
+            ? `${booking.bookedByName}\nStudent: ${booking.studentName}`
+            : booking.studentName || booking.bookedByName || 'Booked';
+          
+          seats.forEach((seatId) => {
+            bookedInfo[seatId] = {
+              type: 'booking',
+              displayName,
+              booking
+            };
+          });
         }
       });
 
@@ -363,14 +381,14 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
         if (blockStart == null || blockEnd == null) return;
 
         if (selectedRange.start < blockEnd && selectedRange.end > blockStart && block.seatId) {
-          blockedByAdmin.push(block.seatId);
+          bookedInfo[block.seatId] = { type: 'admin-block' };
         }
       });
 
-      setBookedSeats([...new Set([...booked, ...blockedByAdmin])]);
+      setBookedSeatsInfo(bookedInfo);
       setStatusMessage('');
     } catch (err) {
-      setBookedSeats([]);
+      setBookedSeatsInfo({});
       setIsFixedScheduleBlocked(false);
     }
   };
@@ -382,7 +400,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
 
   // Toggle seat selection
   const toggleSeat = (seat) => {
-    if (bookedSeats.includes(seat)) return;
+    if (bookedSeatsInfo[seat]) return;
 
     if (allowMultipleSeats) {
       // Multiple seat selection for special bookings (max by studentCount)
@@ -524,8 +542,20 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
   // Render individual seat button
   const renderSeat = (seat) => {
     const seatId = seat.id || `${seat.row}${seat.column}`;
-    const isBooked = bookedSeats.includes(seatId);
+    const bookingInfo = bookedSeatsInfo[seatId];
+    const isBooked = !!bookingInfo;
     const isSelected = allowMultipleSeats ? selectedSeats.includes(seatId) : selectedSeat === seatId;
+
+    let title = '';
+    if (bookingInfo) {
+      if (bookingInfo.type === 'booking') {
+        title = bookingInfo.displayName;
+      } else if (bookingInfo.type === 'fixed-schedule') {
+        title = 'Occupied by fixed schedule';
+      } else if (bookingInfo.type === 'admin-block') {
+        title = 'Blocked by admin';
+      }
+    }
 
     return (
       <button
@@ -534,6 +564,7 @@ export default function SeatBooking({ userName, onBookingCreated, hideAcademicFi
         disabled={isBooked}
         onClick={() => toggleSeat(seatId)}
         type="button"
+        title={title}
       >
         {seatId}
       </button>
