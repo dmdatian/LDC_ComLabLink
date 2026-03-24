@@ -2416,7 +2416,7 @@ export default function AdminDashboard({ user, userName }) {
                 </div>
               ))}
             </div>
-            <div className="flex items-end gap-2 h-48">
+            <div className="flex items-end gap-2 h-48 overflow-x-auto">
               {bookingStatusSeries.map((entry) => {
                 const total = REPORT_STATUS_KEYS.reduce((sum, status) => sum + (entry[status] || 0), 0);
                 const heightPercent = (total / maxDailyTotal) * 100;
